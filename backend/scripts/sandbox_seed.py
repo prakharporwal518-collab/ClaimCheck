@@ -73,11 +73,33 @@ def create_order(http, tok, invoice, item, amount, address) -> dict:
     return r.json()
 
 
-def capture(http, tok, order_id) -> dict:
+def capture(http, tok, order_id) -> tuple[bool, dict]:
     r = http.post(f"{BASE}/v2/checkout/orders/{order_id}/capture",
                   headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
-    r.raise_for_status()
-    return r.json()
+    try:
+        body = r.json()
+    except ValueError:
+        body = {"message": r.text}
+    return r.status_code in (200, 201), body
+
+
+HINTS = {
+    "ORDER_NOT_APPROVED": "The buyer has not approved this order yet. Open the link, log in as the "
+                          "Sandbox *personal* buyer and click Pay, then try again.",
+    "PAYER_ACTION_REQUIRED": "The buyer has not approved this order yet. Open the link, log in as the "
+                             "Sandbox *personal* buyer and click Pay, then try again.",
+    "DUPLICATE_INVOICE_ID": "This invoice was already paid in an earlier run. Run again with a new suffix: "
+                            "set INVOICE_SUFFIX=-2",
+    "ORDER_ALREADY_CAPTURED": "This order was already captured.",
+    "INSTRUMENT_DECLINED": "The buyer's test card/balance was declined. Open the link again and choose "
+                           "another payment method (PayPal balance).",
+}
+
+
+def explain(body: dict) -> str:
+    issue = (body.get("details") or [{}])[0].get("issue") or body.get("name", "")
+    hint = HINTS.get(issue, "")
+    return f"PayPal says: {issue or body.get('name')} – {body.get('message', '')}" + (f"\n  → {hint}" if hint else "")
 
 
 def main() -> None:
@@ -90,10 +112,19 @@ def main() -> None:
             order = create_order(http, tok, invoice + suffix, item, amount, address)
             approve = next((link["href"] for link in order["links"] if link["rel"] in ("payer-action", "approve")), None)
             print(f"\n{invoice}  {item}  ${amount}\n  order {order['id']}\n  approve as Sandbox buyer: {approve}")
-            input("  Press Enter after approving… ")
-            cap = capture(http, tok, order["id"])
-            cap_id = cap["purchase_units"][0]["payments"]["captures"][0]["id"]
-            print(f"  captured: {cap['status']} (transaction {cap_id})")
+            while True:
+                answer = input("  Approve it in the browser, then press Enter (or type s + Enter to skip)… ")
+                if answer.strip().lower() == "s":
+                    print("  skipped")
+                    break
+                ok, cap = capture(http, tok, order["id"])
+                if ok:
+                    cap_id = cap["purchase_units"][0]["payments"]["captures"][0]["id"]
+                    print(f"  captured: {cap['status']} (transaction {cap_id})")
+                    break
+                print("  " + explain(cap))
+                if "DUPLICATE_INVOICE_ID" in str(cap) or "ORDER_ALREADY_CAPTURED" in str(cap):
+                    break
     print("\nNow open an 'Item not received' dispute for each payment as the Sandbox buyer,"
           " then press 'Sync from PayPal' in ClaimCheck with PAYPAL_MODE=sandbox.")
 
