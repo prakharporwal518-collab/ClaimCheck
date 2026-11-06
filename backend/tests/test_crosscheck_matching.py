@@ -54,3 +54,9 @@ def test_schema_forces_ids(monkeypatch):
     item = seen["schema"]["properties"]["results"]["items"]["properties"]
     assert item["claim"]["enum"] == ["c1", "c2"]
     assert item["evidence"]["items"]["enum"] == ["e1"]
+
+
+def test_prompts_forbid_nitpicking():
+    # The honesty case once argued "11 days rather than two weeks"; the prompts now rule that out.
+    assert "two weeks" in analyse.CROSS_SYSTEM and "NOT a contradiction" in analyse.CROSS_SYSTEM
+    assert "minor details" in analyse.REPORT_SYSTEM
