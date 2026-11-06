@@ -1,0 +1,82 @@
+{
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+  "label": "Item Not Received",
+  "status": "complete",
+  "claim_types": {
+    "not_received": "Buyer says the item never arrived",
+    "not_delivered_to_address": "Buyer says nothing came to their address",
+    "tracking_wrong": "Buyer says the tracking status is wrong or fake",
+    "no_response": "Buyer says the seller ignored them",
+    "delayed": "Buyer complains about how long it has taken",
+    "carrier_problem": "Buyer says the carrier reported a problem (exception, returned, lost)",
+    "other": "Any other factual statement"
+  },
+  "checklist": [
+    {
+      "id": "tracking_number",
+      "label": "Tracking number from the carrier",
+      "critical": true,
+      "satisfied_by": [
+        "tracking_number"
+      ]
+    },
+    {
+      "id": "carrier_delivered",
+      "label": "Carrier status shows Delivered",
+      "critical": true,
+      "satisfied_by": [
+        "carrier_delivered"
+      ]
+    },
+    {
+      "id": "address_match",
+      "label": "Delivery address matches the PayPal shipping address",
+      "critical": false,
+      "satisfied_by": [
+        "address_match"
+      ]
+    },
+    {
+      "id": "signature_or_photo",
+      "label": "Proof of delivery signature or delivery photo",
+      "critical": true,
+      "satisfied_by": [
+        "signature",
+        "delivery_photo"
+      ]
+    },
+    {
+      "id": "buyer_after_delivery",
+      "label": "Buyer messages after the delivery date",
+      "critical": false,
+      "satisfied_by": [
+        "buyer_confirmation",
+        "buyer_message"
+      ]
+    },
+    {
+      "id": "invoice",
+      "label": "Invoice or order confirmation",
+      "critical": false,
+      "satisfied_by": [
+        "order"
+      ]
+    }
+  ],
+  "strong_evidence_kinds": [
+    "carrier_delivered",
+    "signature",
+    "delivery_photo",
+    "buyer_confirmation"
+  ],
+  "extraction_hints": [
+    "carrier name and tracking number",
+    "the latest carrier status and its date",
+    "who signed for the parcel",
+    "the delivery address on the tracking record",
+    "chat messages from the buyer after delivery",
+    "replies sent by the seller"
+  ],
+  "accept_claim_reason": "LOST_IN_MAIL",
+  "paypal_evidence_type": "PROOF_OF_FULFILLMENT"
+}

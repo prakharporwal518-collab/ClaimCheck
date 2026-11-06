@@ -1,0 +1,43 @@
+# Render Blueprint: deploy ClaimCheck with one click (Dashboard > New > Blueprint).
+services:
+  # FastAPI API + built React app on one URL
+  - type: web
+    name: claimcheck
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: claimcheck-db
+          property: connectionString
+      - key: PAYPAL_MODE
+        value: mock            # set to "sandbox" once PayPal credentials are added
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: USE_RENDER_WORKFLOWS
+        value: "false"         # set "true" after creating the Workflow service below
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_WORKFLOW_SLUG
+        value: claimcheck-workflows
+
+databases:
+  - name: claimcheck-db
+    plan: free
+    databaseName: claimcheck
+    user: claimcheck
+
+# Render Workflows (beta) are created from the dashboard: New > Workflow,
+# same repo, root directory "backend", build "pip install -r requirements.txt",
+# start "python workflows/main.py", slug "claimcheck-workflows", and the same
+# DATABASE_URL + GEMINI_API_KEY env vars. See README "Render Workflows".

@@ -1,0 +1,5 @@
+Order ID,Email,Customer,Item,Total,Carrier,Tracking Number,Fulfilled At
+INV-10482,rohan.sharma@mail.example,Rohan Sharma,Voltway Pulse ANC Wireless Headphones,249.00,SwiftParcel,SPX4821390057,2026-10-28
+INV-10511,emily.carter@mail.example,Emily Carter,Voltway MagSafe Charger Bundle,89.99,SwiftParcel,SPX4837710442,2026-10-14
+INV-10530,liam.oconnor@mail.example,Liam O'Connor,Voltway Fit 2 Smartwatch,129.50,SwiftParcel,SPX4840215566,2026-10-16
+INV-10547,sofia.rossi@mail.example,Sofia Rossi,Voltway USB-C Hub 7-in-1,59.00,SwiftParcel,SPX4854702218,2026-10-09
