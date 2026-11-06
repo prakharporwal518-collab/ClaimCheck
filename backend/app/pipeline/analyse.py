@@ -30,30 +30,48 @@ from .playbooks import get_playbook
 # ---------------------------------------------------------------------------
 
 
-def extract_one(evidence_id: int) -> dict:
-    # Claim the file atomically so an upload thread and an analysis run never
-    # extract the same file twice.
+def extract_group(evidence_ids: list[int]) -> dict:
+    """Extract a group of files from one dispute (small documents share one LLM call)."""
+    claimed_ids = []
     with SessionLocal() as s:
-        claimed = (
-            s.query(Evidence)
-            .filter(Evidence.id == evidence_id, Evidence.state == "pending")
-            .update({"state": "processing"})
-        )
+        for eid in evidence_ids:
+            # Claim each file atomically so an upload thread and an analysis run
+            # never extract the same file twice.
+            n = (
+                s.query(Evidence)
+                .filter(Evidence.id == eid, Evidence.state == "pending")
+                .update({"state": "processing"})
+            )
+            if n:
+                claimed_ids.append(eid)
         s.commit()
-    if not claimed:
-        return {"evidence_id": evidence_id, "state": "skipped"}
+    if not claimed_ids:
+        return {"evidence_ids": evidence_ids, "state": "skipped"}
     with SessionLocal() as s:
-        ev = s.get(Evidence, evidence_id)
-        if not ev:
-            return {"evidence_id": evidence_id, "state": "missing"}
-        d = ev.dispute
+        evs = [e for e in (s.get(Evidence, i) for i in claimed_ids) if e]
+        d = evs[0].dispute
         try:
-            extract_mod.extract_evidence(ev, d, get_merchant(s), get_playbook(d.reason))
+            extract_mod.extract_batch(evs, d, get_merchant(s), get_playbook(d.reason))
         except Exception as e:  # keep the pipeline alive; the card shows the error
-            ev.state = "error"
-            ev.error = f"Extraction failed: {e}"
+            for ev in evs:
+                ev.state = "error"
+                ev.error = f"Extraction failed: {e}"
         s.commit()
-        return {"evidence_id": ev.id, "state": ev.state, "facts": len(ev.facts or [])}
+        return {"evidence_ids": claimed_ids, "facts": {ev.id: len(ev.facts or []) for ev in evs}}
+
+
+def extract_one(evidence_id: int) -> dict:
+    return extract_group([evidence_id])
+
+
+def plan_groups(evidence_ids: list[int]) -> list[list[int]]:
+    """Documents (PDF/CSV) go together so they can share one LLM call; each image is its own
+    group because OCR is the slow part and it may need the vision model."""
+    with SessionLocal() as s:
+        rows = [(e.id, e.mime) for e in s.query(Evidence).filter(Evidence.id.in_(evidence_ids))]
+    docs = [i for i, m in rows if not m.startswith("image/")]
+    images = [[i] for i, m in rows if m.startswith("image/")]
+    return ([docs] if docs else []) + images
 
 
 def pending_evidence_ids(dispute_id: str) -> list[int]:
@@ -339,12 +357,13 @@ def run_analysis(dispute_id: str, *, extract_parallel: bool = True) -> dict:
         st = time.time()
         ids = pending_evidence_ids(dispute_id)
         if ids:
-            if extract_parallel and len(ids) > 1:
-                with ThreadPoolExecutor(max_workers=min(4, len(ids))) as pool:
-                    list(pool.map(extract_one, ids))
+            groups = plan_groups(ids)
+            if extract_parallel and len(groups) > 1:
+                with ThreadPoolExecutor(max_workers=min(4, len(groups))) as pool:
+                    list(pool.map(extract_group, groups))
             else:
-                for i in ids:
-                    extract_one(i)
+                for g in groups:
+                    extract_group(g)
         for _ in range(240):  # wait for files still being extracted by upload threads
             with SessionLocal() as s:
                 busy = s.query(Evidence).filter_by(dispute_id=dispute_id, state="processing").count()

@@ -232,6 +232,12 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
                   <li key={i} className={`flex items-start gap-2 rounded px-2 py-1 text-sm ${f.needs_confirmation && !f.confirmed ? 'bg-amber-50 ring-1 ring-amber-200' : ''}`}>
                     <span className="chip mt-0.5 bg-white font-mono text-[10px] text-slate-500 ring-1 ring-slate-200">{f.kind}</span>
                     <span className="flex-1 text-slate-800">{f.fact}</span>
+                    {f.confidence != null && (
+                      <span title="OCR confidence of the line this fact was read from"
+                        className={`chip shrink-0 font-mono text-[10px] ${f.confidence < 60 ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-500 ring-1 ring-slate-200'}`}>
+                        {Math.round(f.confidence)}%
+                      </span>
+                    )}
                     {f.needs_confirmation && (
                       <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-800">
                         <input type="checkbox" checked={!!f.confirmed} onChange={(e) => updateFact(i, { confirmed: e.target.checked })} />

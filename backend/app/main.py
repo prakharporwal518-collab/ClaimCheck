@@ -34,7 +34,7 @@ from .paypal import mock_data
 from .paypal.client import MockClient, PayPalError, get_client
 from .pipeline import extract as extract_mod
 from .pipeline import llm
-from .pipeline.analyse import extract_one
+from .pipeline.analyse import extract_group, plan_groups
 from .pipeline.playbooks import PLAYBOOKS, get_playbook
 from .report_pdf import build_pdf
 
@@ -249,8 +249,10 @@ def get_dispute(dispute_id: str):
 def _extract_async(ids: list[int]) -> None:
     if settings.workflows_enabled:
         return  # the Render Workflow extracts files in parallel when analysis starts
-    for i in ids:
-        threading.Thread(target=extract_one, args=(i,), daemon=True).start()
+    if not ids:
+        return
+    for group in plan_groups(ids):
+        threading.Thread(target=extract_group, args=(group,), daemon=True).start()
 
 
 def _add_evidence(s, d: Dispute, filename: str, data: bytes, mime: str, tag: str) -> Evidence:

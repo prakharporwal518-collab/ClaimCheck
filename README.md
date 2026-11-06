@@ -20,7 +20,7 @@ There are three demo cases: **strong evidence** (PP-D-48213, merchant should win
 
 ## Quick start (local)
 
-Requirements: Python 3.11+, Node 20+, and optionally Tesseract (`apt install tesseract-ocr` / `brew install tesseract`).
+Requirements: Python 3.11+, Node 20+, and optionally Tesseract with the Hindi pack (`apt install tesseract-ocr tesseract-ocr-hin` / `brew install tesseract tesseract-lang`; on Windows, the UB Mannheim installer with Hindi ticked).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -51,6 +51,7 @@ cd backend && python -m pytest -q
 | `PAYPAL_DISPUTES_PATH` | `/v1/customer/disputes` | Base path, kept as one setting so a v2 switch is a one-line change |
 | `PAYPAL_WEBHOOK_ID` | – | Turns on webhook signature verification |
 | `GEMINI_API_KEY` | – | Uses Gemini instead of the rules engine |
+| `OCR_LANGS` | `eng+hin` | Tesseract languages (missing packs are skipped) |
 | `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | `gemini-3.6-flash` / `gemini-3.5-flash-lite` | Primary and fallback models |
 | `USE_RENDER_WORKFLOWS` + `RENDER_API_KEY` | off | Runs the analysis as a Render Workflow |
 | `DATABASE_URL` | SQLite in `backend/data/` | Render Postgres or Supabase in production |
@@ -72,12 +73,12 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 **AI pipeline** (`backend/app/pipeline/`)
 
 - **Step 0, mask buyer PII** (`masking.py`): exact match on the buyer's name, email and address from PayPal, then regex for emails, phones, Luhn-valid card numbers and PIN/ZIP codes. The merchant's own details are on an allowlist and never masked. The mapping stays on the server, so the merchant sees real names.
-- **Step 1, extract facts** (`extract.py`): OCR-first rule. Tesseract runs on every image; Gemini vision is used only when confidence is below 60% or the file is tagged "Delivery photo". Low-confidence facts are shown amber and must be confirmed before analysis.
+- **Step 1, extract facts** (`extract.py`): OCR-first rule. Tesseract (English + Hindi, so Hindi/Hinglish chats are read) runs on every image; Gemini vision is used only when confidence is below 60% or the file is tagged "Delivery photo". Each fact gets the confidence of the OCR line it came from, and only facts below 60% are shown amber and must be confirmed before analysis.
 - **Steps 2–4** (`analyse.py`): claims and cross-check by Gemini with strict JSON schemas (or the rules engine). Guardrail: any "contradicted" or "supported" result without a valid evidence ID is downgraded to unverified. Text inside files is treated as data, never as instructions.
 - **Score** (`scoring.py`), computed in code: start at 4, +2 per claim contradicted by strong evidence, +1 weak, −2 per missing critical item, −3 per claim the buyer is right about, clamped to 0–10. High 7–10, Medium 4–6, Low 0–3.
 - **Integrity check** (`integrity.py`): tracking numbers, order IDs and amounts must agree across files and with the PayPal transaction; the tracking address must match the PayPal shipping address. Each file gets an "OK / Check" badge.
 - **Reason playbooks** (`playbooks/*.json`): Item Not Received is complete; "Not as Described" is a stub, which shows that adding a reason is configuration.
-- **Free-tier safety**: retries with exponential backoff, a fallback model, and a cache keyed by a hash of each request.
+- **Free-tier safety**: small documents (PDFs, CSV) of a dispute share one Gemini call; images that need vision get their own. Plus retries with exponential backoff, a fallback model, and a cache keyed by a hash of each request.
 
 **API endpoints**: `GET /api/disputes`, `GET /api/disputes/{id}`, `POST /api/disputes/{id}/evidence`, `POST /api/disputes/{id}/analyse`, `PUT /api/disputes/{id}/report`, `POST /api/disputes/{id}/submit`, `POST /api/disputes/{id}/accept-claim`, `GET /api/disputes/{id}/report.pdf`, `POST /api/webhooks/paypal`, `GET /api/analytics`. A Postman collection is in [`docs/ClaimCheck.postman_collection.json`](docs/ClaimCheck.postman_collection.json), and FastAPI serves interactive docs at `/docs`.
 
@@ -113,7 +114,7 @@ Kernel (live carrier tracking check, against forged PDFs), Channel3 (product dat
 - Evidence strength is a **heuristic**, not a win guarantee. PayPal decides the outcome.
 - **Item Not Received only** in the MVP.
 - Tracking status comes only from what the merchant uploads (an order CSV import is included).
-- OCR can misread blurry photos or handwriting; low-confidence facts must be confirmed.
+- OCR can misread blurry photos or handwriting; facts read from low-confidence lines must be confirmed. Hindi is supported; other languages need their Tesseract pack.
 - PII masking is rule-based; a test scans every logged LLM prompt for the test buyer's PII.
 - Sandbox is not production; the seeded data is in the same shape as the API.
 - **Not legal advice.** Nothing is submitted without the merchant's explicit approval, and the audit log keeps the AI draft next to the final version.
@@ -128,7 +129,7 @@ backend/
   workflows/      Render Workflows tasks
   scripts/        sample-evidence generator, PayPal Sandbox seed script
   sample_evidence/  the three demo evidence sets + orders_export.csv
-  tests/          pytest (masking, scoring, pipeline, API, PII-leak, AI chat)
+  tests/          pytest (masking, scoring, pipeline, API, PII-leak, AI chat, Hindi OCR, batching)
 frontend/         React + Vite + Tailwind + AG Grid + AG Studio
 docs/             Postman collection, screenshots
 Dockerfile, render.yaml
