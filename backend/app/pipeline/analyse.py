@@ -487,7 +487,11 @@ def run_analysis(dispute_id: str, *, extract_parallel: bool = True) -> dict:
                 strength_line=sc["line"],
                 score_breakdown=sc["breakdown"],
                 recommendation=rec,
-                engine=(settings.gemini_model if uses_llm else "rules engine (no Gemini key)"),
+                engine=(
+                    settings.gemini_model if uses_llm
+                    else "rules engine (Gemini call failed – see the backend window)" if settings.gemini_enabled
+                    else "rules engine (no Gemini key)"
+                ),
                 steps=steps,
                 cache_key=key,
                 duration_ms=int((time.time() - t0) * 1000),
