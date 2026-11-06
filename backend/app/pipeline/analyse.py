@@ -13,6 +13,7 @@ it took, and which engine produced it.
 from __future__ import annotations
 
 import hashlib
+import logging
 import json
 import re
 import time
@@ -24,6 +25,8 @@ from . import extract as extract_mod
 from . import integrity, llm, scoring
 from .masking import Masker
 from .playbooks import get_playbook
+
+log = logging.getLogger("claimcheck.analyse")
 
 # ---------------------------------------------------------------------------
 # Extraction helpers (also called by the Render Workflow task)
@@ -207,15 +210,45 @@ def llm_claims(message: str, playbook: dict, dispute_id: str) -> tuple[list[dict
     return claims, model
 
 
+def _norm(text) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+def match_results(claims: list[dict], raw_results: list[dict]) -> tuple[list[dict | None], int]:
+    """Pair the model's results with our claims. Models sometimes echo the claim text,
+    a bare number or "C1" instead of the id, so match on all of those, then by position."""
+    lookup: dict[str, int] = {}
+    for i, c in enumerate(claims):
+        for key in (c["id"], c["id"].lstrip("c"), c["text"]):
+            lookup.setdefault(_norm(key), i)
+    paired: list[dict | None] = [None] * len(claims)
+    unmatched = []
+    for r in raw_results:
+        i = lookup.get(_norm(r.get("claim") or r.get("claim_id") or r.get("id")))
+        if i is None:  # partial text match ("never showed up" vs the full sentence)
+            key = _norm(r.get("claim"))
+            i = next((j for j, c in enumerate(claims) if key and (key in _norm(c["text"]) or _norm(c["text"]) in key)), None)
+        if i is not None and paired[i] is None:
+            paired[i] = r
+        else:
+            unmatched.append(r)
+    for i in range(len(claims)):  # last resort: keep the model's order
+        if paired[i] is None and unmatched and len(raw_results) == len(claims):
+            paired[i] = unmatched.pop(0)
+    return paired, sum(p is not None for p in paired)
+
+
 def llm_crosscheck(claims, facts, dispute_id) -> tuple[list[dict], str]:
+    fact_ids = [f["id"] for f in facts]
+    evidence_items = {"type": "string", "enum": fact_ids} if fact_ids else {"type": "string"}
     schema = {
         "type": "object",
         "properties": {"results": {"type": "array", "items": {
             "type": "object",
             "properties": {
-                "claim": {"type": "string"},
+                "claim": {"type": "string", "enum": [c["id"] for c in claims]},
                 "status": {"type": "string", "enum": ["supported", "contradicted", "unverified"]},
-                "evidence": {"type": "array", "items": {"type": "string"}},
+                "evidence": {"type": "array", "items": evidence_items},
                 "why": {"type": "string"},
             },
             "required": ["claim", "status", "evidence", "why"]}}},
@@ -223,17 +256,26 @@ def llm_crosscheck(claims, facts, dispute_id) -> tuple[list[dict], str]:
     }
     slim_facts = [{k: f[k] for k in ("id", "source", "kind", "fact", "date")} for f in facts]
     prompt = (
+        "Return exactly one result per claim. In 'claim' put the claim id (for example c1), "
+        "and in 'evidence' put fact ids (for example e3).\n"
         "<claims>\n" + json.dumps([{"id": c["id"], "text": c["text"]} for c in claims], indent=1)
         + "\n</claims>\n<evidence_facts>\n" + json.dumps(slim_facts, indent=1) + "\n</evidence_facts>"
     )
     out, model = llm.generate_json(step="crosscheck", system=CROSS_SYSTEM, prompt=prompt, schema=schema,
                                    dispute_id=dispute_id)
-    by_claim = {r.get("claim"): r for r in out.get("results", [])}
+    paired, matched = match_results(claims, out.get("results", []))
+    if matched < len(claims):
+        log.warning("Cross-check: model assessed %d of %d claims; using rules for the rest", matched, len(claims))
+    rules = {r["claim_id"]: r for r in rules_crosscheck(claims, facts)}
     results = []
-    for c in claims:
-        r = by_claim.get(c["id"], {"status": "unverified", "evidence": [], "why": "Not assessed."})
+    for c, r in zip(claims, paired):
+        if r is None:  # the model skipped this claim: fall back to the rules engine for it
+            fb = rules[c["id"]]
+            results.append({**fb, "why": fb["why"] + " (rules engine: the AI did not assess this claim)"})
+            continue
+        ev = r.get("evidence") or []
         results.append({"claim_id": c["id"], "status": r.get("status", "unverified"),
-                        "evidence": r.get("evidence", []), "why": r.get("why", "")})
+                        "evidence": [e.strip() for e in ev if isinstance(e, str)], "why": r.get("why", "")})
     return results, model
 
 
