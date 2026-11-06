@@ -16,6 +16,7 @@ for each payment, set PAYPAL_MODE=sandbox on the backend, and press
 
 import os
 import sys
+import uuid
 
 import httpx
 
@@ -40,6 +41,8 @@ def token(http: httpx.Client) -> str:
         auth=(os.environ["PAYPAL_CLIENT_ID"], os.environ["PAYPAL_CLIENT_SECRET"]),
         data={"grant_type": "client_credentials"},
     )
+    if r.status_code == 401:
+        sys.exit("PayPal rejected the Client ID / Secret. Copy them again from the Sandbox app (no spaces).")
     r.raise_for_status()
     return r.json()["access_token"]
 
@@ -62,7 +65,10 @@ def create_order(http, tok, invoice, item, amount, address) -> dict:
             "return_url": "https://example.com/return", "cancel_url": "https://example.com/cancel"}}},
     }
     r = http.post(f"{BASE}/v2/checkout/orders", json=body,
-                  headers={"Authorization": f"Bearer {tok}", "PayPal-Request-Id": f"claimcheck-{invoice}"})
+                  headers={"Authorization": f"Bearer {tok}", "PayPal-Request-Id": f"claimcheck-{uuid.uuid4().hex}"})
+    if r.status_code == 422 and "DUPLICATE_INVOICE_ID" in r.text:
+        sys.exit(f"{invoice} was already used in an earlier run. Its order already exists, so open the dispute on it, "
+                 "or set INVOICE_SUFFIX=-2 (any new text) and run again.")
     r.raise_for_status()
     return r.json()
 
@@ -79,8 +85,9 @@ def main() -> None:
         sys.exit("Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET (Sandbox REST app) first.")
     with httpx.Client(timeout=30) as http:
         tok = token(http)
+        suffix = os.getenv("INVOICE_SUFFIX", "")
         for invoice, item, amount, address in CASES:
-            order = create_order(http, tok, invoice, item, amount, address)
+            order = create_order(http, tok, invoice + suffix, item, amount, address)
             approve = next((link["href"] for link in order["links"] if link["rel"] in ("payer-action", "approve")), None)
             print(f"\n{invoice}  {item}  ${amount}\n  order {order['id']}\n  approve as Sandbox buyer: {approve}")
             input("  Press Enter after approving… ")

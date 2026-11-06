@@ -65,7 +65,10 @@ def _startup() -> None:
     init_db()
     with SessionLocal() as s:
         if s.query(Dispute).count() == 0:
-            sync.sync_all(s, get_client())
+            try:
+                sync.sync_all(s, get_client())
+            except Exception as e:  # wrong PayPal keys must not stop the app from starting
+                log.error("Could not sync disputes from PayPal at startup: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +220,8 @@ def sync_disputes():
         try:
             return sync.sync_all(s, get_client())
         except PayPalError as e:
-            raise HTTPException(502, f"PayPal error: {e} ({e.status}) {e.body}")
+            hint = " Check PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET." if e.status == 401 else ""
+            raise HTTPException(502, f"PayPal error: {e} ({e.status}) {e.body}.{hint}")
 
 
 @app.get("/api/disputes/{dispute_id}")

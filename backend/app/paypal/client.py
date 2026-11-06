@@ -78,14 +78,17 @@ class SandboxClient(PayPalClient):
     def _access_token(self) -> str:
         if self._token and time.time() < self._token_expiry - 60:
             return self._token
-        r = self._http.post(
-            f"{self.base}/v1/oauth2/token",
-            auth=(settings.paypal_client_id, settings.paypal_client_secret),
-            data={"grant_type": "client_credentials"},
-            headers={"Accept": "application/json"},
-        )
+        try:
+            r = self._http.post(
+                f"{self.base}/v1/oauth2/token",
+                auth=(settings.paypal_client_id, settings.paypal_client_secret),
+                data={"grant_type": "client_credentials"},
+                headers={"Accept": "application/json"},
+            )
+        except httpx.HTTPError as e:
+            raise PayPalError(f"Could not reach PayPal ({e.__class__.__name__}): check your internet connection")
         if r.status_code != 200:
-            raise PayPalError("PayPal OAuth failed", r.status_code, r.text)
+            raise PayPalError("PayPal OAuth failed: check PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET", r.status_code, r.text)
         body = r.json()
         self._token = body["access_token"]
         self._token_expiry = time.time() + int(body.get("expires_in", 3000))
@@ -94,7 +97,10 @@ class SandboxClient(PayPalClient):
     def _request(self, method: str, path: str, **kw) -> dict:
         headers = kw.pop("headers", {})
         headers["Authorization"] = f"Bearer {self._access_token()}"
-        r = self._http.request(method, f"{self.base}{path}", headers=headers, **kw)
+        try:
+            r = self._http.request(method, f"{self.base}{path}", headers=headers, **kw)
+        except httpx.HTTPError as e:
+            raise PayPalError(f"Could not reach PayPal ({e.__class__.__name__}): check your internet connection")
         if r.status_code >= 400:
             try:
                 body = r.json()
