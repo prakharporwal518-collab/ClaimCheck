@@ -61,7 +61,8 @@ def sync_all(s, client: PayPalClient) -> dict:
     new = 0
     for item in items:
         existing = s.get(Dispute, item["dispute_id"])
-        if existing and existing.status == item.get("status") and existing.raw:
+        if (existing and existing.status == item.get("status") and existing.raw
+                and existing.sample_set == item.get("x_sample_set", existing.sample_set)):
             continue
         detail = client.get_dispute(item["dispute_id"])
         _, created = upsert_dispute(s, client, detail)

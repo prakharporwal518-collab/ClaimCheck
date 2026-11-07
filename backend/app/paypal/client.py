@@ -187,6 +187,7 @@ class MockClient(PayPalClient):
                 "dispute_state": d.get("dispute_state", "REQUIRED_ACTION"),
                 "dispute_amount": d["dispute_amount"],
                 "links": [],
+                **({"x_sample_set": d["x_sample_set"]} if d.get("x_sample_set") else {}),  # demo-only extra
             }
             for d in self._store.values()
         ]
