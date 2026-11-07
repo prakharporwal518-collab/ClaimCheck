@@ -23,7 +23,7 @@ function DaysLeft({ data }) {
 function Status({ data }) {
   const cls = isOpen(data)
     ? 'bg-amber-50 text-amber-800 ring-amber-200'
-    : data.status === 'UNDER_REVIEW'
+    : ['UNDER_REVIEW', 'WAITING_FOR_BUYER_RESPONSE', 'OTHER'].includes(data.status)
       ? 'bg-blue-50 text-blue-800 ring-blue-200'
       : 'bg-slate-100 text-slate-600 ring-slate-200'
   return <span className={`chip ring-1 ${cls}`}>{statusText(data.status)}</span>

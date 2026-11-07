@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .db import Analysis, Dispute, audit
+from .db import Analysis, AuditLog, Dispute, audit
 from .paypal.client import PayPalClient, normalise_dispute
 from .pipeline import scoring
 
@@ -22,9 +22,21 @@ def upsert_dispute(s, client: PayPalClient, detail: dict) -> tuple[Dispute, bool
         setattr(d, k, v)
     d.raw = detail
     d.sample_set = detail.get("x_sample_set", d.sample_set or "")
-    if d.status == "RESOLVED" and d.outcome:
-        if d.decision in (None, "open"):
-            d.decision = (detail.get("x_claimcheck_history") or {}).get("decision", "submitted")
+    # Work out the merchant's decision from PayPal's status when ClaimCheck has no record of it
+    # (e.g. a dispute handled before, or a fresh database).
+    acted_here = (not created) and s.query(AuditLog).filter(
+        AuditLog.dispute_id == d.id, AuditLog.action.in_(["submitted_to_paypal", "accepted_claim"])
+    ).count() > 0
+    if not acted_here:
+        d.decision = "open"
+    if d.decision in (None, "open"):
+        hist_decision = (detail.get("x_claimcheck_history") or {}).get("decision")
+        if hist_decision:
+            d.decision = hist_decision
+        elif d.status == "RESOLVED" and d.outcome:
+            d.decision = "refunded" if d.outcome == "lost" else "submitted"
+        elif d.status in ("UNDER_REVIEW", "WAITING_FOR_BUYER_RESPONSE"):
+            d.decision = "submitted"  # PayPal only moves on after the seller responds
     hist = detail.get("x_claimcheck_history")
     if created and hist:
         # Seeded demo history for the analytics page (clearly labelled).
@@ -61,7 +73,8 @@ def sync_all(s, client: PayPalClient) -> dict:
     new = 0
     for item in items:
         existing = s.get(Dispute, item["dispute_id"])
-        if (existing and existing.status == item.get("status") and existing.raw
+        # Demo disputes only change when we change them; real PayPal disputes are always refreshed.
+        if (client.mode == "mock" and existing and existing.status == item.get("status") and existing.raw
                 and existing.sample_set == item.get("x_sample_set", existing.sample_set)):
             continue
         detail = client.get_dispute(item["dispute_id"])
