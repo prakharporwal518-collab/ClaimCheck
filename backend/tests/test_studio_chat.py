@@ -45,3 +45,33 @@ def test_studio_turn_without_key():
 
     r = llm.studio_turn({"input": [], "responseFormat": {"type": "text"}})
     assert "Gemini key" in r["output"][0]["content"][0]["text"]
+
+
+def test_studio_turn_uses_fallback_model_and_explains_quota(monkeypatch):
+    from app.config import settings
+    from app.pipeline import llm
+
+    calls = []
+
+    def quota_on_main(model, body):
+        calls.append(model)
+        if model == settings.gemini_model:
+            raise llm.LlmUnavailable("Gemini 429: quota exceeded")
+        return {"candidates": [{"content": {"parts": [{"text": "Answer from the backup model"}]}}]}
+
+    monkeypatch.setattr(settings, "gemini_api_key", "k")
+    monkeypatch.setattr(llm, "_call", quota_on_main)
+    user = {"id": "m1", "kind": "input", "type": "message", "role": "user", "status": "completed",
+            "content": [{"type": "text", "text": "Win rate?"}]}
+    r = llm.studio_turn({"input": [user], "responseFormat": {"type": "text"}})
+    assert calls == [settings.gemini_model, settings.gemini_fallback_model]
+    assert r["output"][0]["content"][0]["text"] == "Answer from the backup model"
+    assert r["model"] == settings.gemini_fallback_model
+
+    def quota_everywhere(model, body):
+        raise llm.LlmUnavailable("Gemini 429: quota exceeded")
+
+    monkeypatch.setattr(llm, "_call", quota_everywhere)
+    r = llm.studio_turn({"input": [user], "responseFormat": {"type": "text"}})
+    assert "quota is used up" in r["output"][0]["content"][0]["text"]
+    assert "429" not in r["output"][0]["content"][0]["text"]
