@@ -22,6 +22,7 @@ def client():
     from app.main import app
 
     with TestClient(app) as c:
+        c.post("/api/demo/reset")  # start from a clean demo even on a reused database
         yield c
 
 

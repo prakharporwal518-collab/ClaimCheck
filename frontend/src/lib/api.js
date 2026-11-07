@@ -34,7 +34,8 @@ export const api = {
     files.forEach((f, i) => { fd.append('files', f); fd.append('tags', tags[i] || 'Other') })
     return request(`/api/disputes/${id}/evidence`, { method: 'POST', body: fd })
   },
-  loadSample: (id) => request(`/api/disputes/${id}/evidence/sample`, { method: 'POST' }),
+  loadSample: (id, scenario) =>
+    request(`/api/disputes/${id}/evidence/sample`, scenario ? json('POST', { scenario }) : { method: 'POST' }),
   orderCsv: (id, file) => {
     const fd = new FormData()
     fd.append('file', file)
