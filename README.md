@@ -16,6 +16,8 @@ Built for the **PayPal AI Hackathon 2026** (open track).
 6. **Defence report + evidence strength**: an editable report and an explainable score, for example `High (Score: 9/10) – 3 claims contradicted by strong and weak evidence, 0 critical gaps`.
 7. **Submit / refund**: send the report and files through `provide-evidence`, or refund through `accept-claim` when the buyer is right. Export the report as PDF.
 
+**Sample evidence on every dispute:** the three story cases load their prepared files; any other dispute (Sofia, a simulated webhook dispute, a real PayPal Sandbox dispute) offers **Load sample evidence…** with three scenarios (delivered with proof / delivered without proof / returned to sender). Those files are drawn on the spot with that dispute's own buyer, address, order number, item, amount and dates, so they always pass the integrity check.
+
 There are three demo cases: **strong evidence** (PP-D-48213, merchant should win), **weak evidence** (PP-D-48377, a missing signature is flagged) and **buyer is right** (PP-D-48402, the parcel was returned to sender, so ClaimCheck recommends a refund).
 
 ## Quick start (local)

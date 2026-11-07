@@ -4,102 +4,29 @@ All companies, people and tracking numbers here are fictional.
 Run:  python scripts/make_samples.py
 """
 
+import sys
 from pathlib import Path
 
-from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app import sample_gen  # noqa: E402  (one copy of the drawing code)
 
 OUT = Path(__file__).resolve().parent.parent / "sample_evidence"
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FONT_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-MERCHANT_ADDR = "14 MG Road, Bengaluru 560001"
 
 
-def tracking_pdf(path, number, order, ship_to, events, footer=""):
-    pdf = FPDF(format="A4")
-    pdf.add_page()
-    pdf.set_fill_color(234, 88, 12)
-    pdf.rect(0, 0, 210, 22, "F")
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_xy(12, 6)
-    pdf.cell(0, 10, "SwiftParcel Express - Shipment Tracking")
-    pdf.set_text_color(20, 20, 20)
-    pdf.set_xy(12, 30)
-    pdf.set_font("Helvetica", "", 11)
-    for line in [f"Tracking number: {number}", f"Order reference: {order}", f"Ship to: {ship_to}",
-                 "Service: International Priority", ""]:
-        pdf.cell(0, 7, line, new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Scan history", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    for when, what in events:
-        pdf.cell(0, 7, f"{when}   {what}", new_x="LMARGIN", new_y="NEXT")
-    if footer:
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, footer, new_x="LMARGIN", new_y="NEXT")
-    pdf.set_creator("SwiftParcel tracking export")
-    pdf.output(str(path))
+def tracking_pdf(path, *args, **kw):
+    Path(path).write_bytes(sample_gen.tracking_pdf(*args, **kw))
 
 
-def invoice_pdf(path, number, date, buyer, email, phone, ship_to, item, amount, txn):
-    pdf = FPDF(format="A4")
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, "Voltway Electronics - Tax Invoice", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 10)
-    for line in [MERCHANT_ADDR, "support@voltway.example | voltway.example", ""]:
-        pdf.cell(0, 6, line, new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    for line in [
-        f"Invoice number: {number}",
-        f"Invoice date: {date}",
-        f"Bill to: {buyer}, {email}, {phone}",
-        f"Ship to: {ship_to}",
-        "",
-        f"Item: {item}    Qty 1    USD {amount}",
-        f"Total paid: USD {amount}",
-        f"Paid with PayPal, transaction {txn}",
-    ]:
-        pdf.cell(0, 7, line, new_x="LMARGIN", new_y="NEXT")
-    pdf.output(str(path))
+def invoice_pdf(path, *args, **kw):
+    Path(path).write_bytes(sample_gen.invoice_pdf(*args, **kw))
 
 
-def chat_png(path, title, lines):
-    w, h = 1100, 140 + 96 * len(lines)
-    img = Image.new("RGB", (w, h), (245, 247, 250))
-    d = ImageDraw.Draw(img)
-    ft = ImageFont.truetype(FONT_B, 30)
-    fb = ImageFont.truetype(FONT, 26)
-    d.rectangle([0, 0, w, 90], fill=(30, 41, 59))
-    d.text((32, 26), title, fill=(255, 255, 255), font=ft)
-    y = 120
-    for who, text, mine in lines:
-        msg = f"{who}: {text}"
-        tw = d.textlength(msg, font=fb)
-        x = w - tw - 60 if mine else 30
-        fill = (219, 234, 254) if mine else (255, 255, 255)
-        d.rounded_rectangle([x - 18, y - 14, x + tw + 18, y + 50], 18, fill=fill, outline=(203, 213, 225))
-        d.text((x, y), msg, fill=(15, 23, 42), font=fb)
-        y += 96
-    img.save(path)
+def chat_png(path, *args):
+    Path(path).write_bytes(sample_gen.chat_png(*args))
 
 
-def delivery_photo(path, house, stamp):
-    w, h = 1200, 900
-    img = Image.new("RGB", (w, h), (196, 181, 160))
-    d = ImageDraw.Draw(img)
-    d.rectangle([0, 700, w, h], fill=(120, 113, 108))  # porch
-    d.rectangle([420, 120, 780, 700], fill=(87, 50, 30))  # door
-    d.ellipse([735, 400, 755, 420], fill=(234, 179, 8))
-    d.rectangle([840, 200, 1000, 300], fill=(255, 255, 255))
-    d.text((862, 212), house, fill=(15, 23, 42), font=ImageFont.truetype(FONT_B, 64))
-    d.rectangle([470, 560, 700, 720], fill=(180, 130, 70))  # parcel
-    d.rectangle([570, 560, 600, 720], fill=(160, 110, 55))
-    d.rectangle([0, 820, w, h], fill=(0, 0, 0))
-    d.text((24, 836), stamp, fill=(255, 255, 255), font=ImageFont.truetype(FONT, 34))
-    img.save(path, quality=82)
+def delivery_photo(path, *args):
+    Path(path).write_bytes(sample_gen.delivery_photo(*args))
 
 
 def main():

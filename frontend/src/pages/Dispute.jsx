@@ -18,6 +18,12 @@ const PIPELINE = [
   'Gaps + evidence strength',
   'Write defence report',
 ]
+const STORY_SETS = ['strong', 'weak', 'buyer_right']
+const SCENARIOS = [
+  ['strong', 'Delivered + signature, photo, chat'],
+  ['weak', 'Delivered, no proof of delivery'],
+  ['buyer_right', 'Returned to sender (buyer is right)'],
+]
 const SAMPLE_FILES = {
   strong: ['tracking.pdf', 'chat.png', 'delivery_photo.jpg', 'invoice.pdf'],
   weak: ['tracking.pdf', 'invoice.pdf'],
@@ -147,6 +153,23 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
     [reload],
   )
 
+  // Story cases load their prepared set; every other dispute gets files drawn for it
+  // (its own buyer, address, order number, item, amount and dates).
+  const loadSample = async (scenario) => {
+    setBusy(true)
+    try {
+      await api.loadSample(d.id, scenario)
+      notify(d.sample_set === 'starter' && !scenario
+        ? 'Order found in the sample CSV and added as evidence'
+        : 'Sample evidence loaded – reading the files now')
+      await reload()
+    } catch (e) {
+      notify(e.message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const sel = d.evidence.find((e) => e.id === selected) || d.evidence[0]
 
   const updateFact = async (idx, patch) => {
@@ -163,9 +186,17 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
           <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => csvInput.current.click()}>Import order CSV</button>
           {d.sample_set && (
             <button className="btn-ghost px-2.5 py-1 text-xs" disabled={busy}
-              onClick={async () => { setBusy(true); try { await api.loadSample(d.id); notify(d.sample_set === 'starter' ? 'Order found in the sample CSV and added as evidence' : 'Sample evidence loaded'); await reload() } catch (e) { notify(e.message, 'error') } finally { setBusy(false) } }}>
+              onClick={() => loadSample()}>
               {d.sample_set === 'starter' ? 'Import sample order CSV' : 'Load sample evidence'}
             </button>
+          )}
+          {!STORY_SETS.includes(d.sample_set) && (
+            <select aria-label="Load sample evidence" disabled={busy} value=""
+              className="btn-ghost cursor-pointer px-2.5 py-1 text-xs"
+              onChange={(e) => { if (e.target.value) loadSample(e.target.value) }}>
+              <option value="">Load sample evidence…</option>
+              {SCENARIOS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
           )}
         </div>
       }
@@ -180,6 +211,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             <li>Press <b>Generate AI Defence</b> now: claims come back <b>Unverified</b> and the checklist lists exactly what to upload.</li>
             <li>Or click <b>Import sample order CSV</b> (top right): ClaimCheck finds this order in a store export and adds its tracking number.</li>
+            <li>Or pick a scenario in <b>Load sample evidence…</b>: files are made for this dispute (Sofia's name, address and order).</li>
           </ul>
         </div>
       )}
@@ -207,16 +239,8 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
             ))}
           </div>
         ) : (
-          <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
-            Sample files to download and drag in:{' '}
-            {[['strong', 'delivered set'], ['buyer_right', 'returned-to-sender set']].map(([set, label]) => (
-              <span key={set} className="mx-1">
-                <b className="font-semibold text-slate-600">{label}:</b>{' '}
-                {SAMPLE_FILES[set].map((f) => (
-                  <a key={f} href={`${api.base}/samples/${set}/${f}`} download className="mr-1 font-medium text-brand-600 hover:underline">{f}</a>
-                ))}
-              </span>
-            ))}
+          <div className="mt-2 text-xs text-slate-500">
+            No files to hand? Use <b>Load sample evidence…</b> (top right): files are made to match this dispute.
           </div>
         )}
       </div>

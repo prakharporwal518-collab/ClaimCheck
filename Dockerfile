@@ -14,7 +14,7 @@ RUN npm run build
 
 FROM python:3.13-slim
 # Tesseract for the OCR-first rule (images go to Gemini vision only when OCR confidence is low).
-RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-hin \
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-hin fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY backend/requirements.txt ./

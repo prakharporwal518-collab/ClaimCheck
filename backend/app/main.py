@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import runner, sync
+from . import runner, sample_gen, sync
 from .config import BACKEND_DIR, SAMPLE_DIR, settings
 from .db import (
     Analysis,
@@ -179,6 +179,7 @@ def health():
         "paypal_mode": settings.paypal_mode,
         "paypal_sources": enabled_sources(),
         "sandbox_actions_locked": bool(settings.sandbox_actions_key),
+        "sample_scenarios": sample_gen.SCENARIOS,
         "paypal_disputes_path": settings.paypal_disputes_path,
         "gemini": settings.gemini_enabled,
         "gemini_model": settings.gemini_model if settings.gemini_enabled else None,
@@ -313,8 +314,28 @@ async def upload_evidence(dispute_id: str, files: list[UploadFile] = File(...), 
     return {"added": ids}
 
 
+class SampleIn(BaseModel):
+    scenario: str | None = None  # strong | weak | buyer_right: files drawn for this dispute
+
+
 @app.post("/api/disputes/{dispute_id}/evidence/sample")
-def load_sample_evidence(dispute_id: str):
+def load_sample_evidence(dispute_id: str, body: SampleIn | None = None):
+    scenario = body.scenario if body else None
+    if scenario:
+        # Files drawn on the fly with this dispute's own buyer, address, order and dates.
+        if scenario not in sample_gen.SCENARIOS:
+            raise HTTPException(422, f"scenario must be one of {list(sample_gen.SCENARIOS)}")
+        with SessionLocal() as s:
+            d = _get(s, dispute_id)
+            if d.evidence:
+                raise HTTPException(409, "This dispute already has evidence. Remove those files first "
+                                         "(bin icon), then load a sample, so the evidence doesn't mix.")
+            ids = [_add_evidence(s, d, name, data, mime, tag).id
+                   for name, data, mime, tag in sample_gen.generate(d, get_merchant(s), scenario)]
+            audit(s, d.id, "sample_generated", scenario=scenario, files=len(ids))
+            s.commit()
+        _extract_async(ids)
+        return {"added": ids, "scenario": scenario}
     with SessionLocal() as s:
         d = _get(s, dispute_id)
         sample_set = d.sample_set
@@ -328,7 +349,7 @@ def load_sample_evidence(dispute_id: str):
         d = _get(s, dispute_id)
         files = SAMPLE_SETS.get(d.sample_set)
         if not files:
-            raise HTTPException(404, "No sample evidence for this dispute")
+            raise HTTPException(400, "Choose a sample scenario for this dispute")
         existing = {e.filename for e in d.evidence}
         ids = []
         for name, tag in files:
