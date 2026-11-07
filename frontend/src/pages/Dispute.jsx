@@ -170,6 +170,8 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
     }
   }
 
+  // PayPal no longer accepts evidence once a dispute is under review or resolved.
+  const closed = d.status !== 'WAITING_FOR_SELLER_RESPONSE'
   const sel = d.evidence.find((e) => e.id === selected) || d.evidence[0]
 
   const updateFact = async (idx, patch) => {
@@ -181,7 +183,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
   return (
     <Section
       title={`Merchant evidence (${d.evidence.length}/${MAX_FILES})`}
-      right={
+      right={closed ? null : (
         <div className="flex gap-2">
           <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => csvInput.current.click()}>Import order CSV</button>
           {d.sample_set && (
@@ -199,12 +201,17 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
             </select>
           )}
         </div>
-      }
+      )}
     >
       <input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={async (e) => {
         try { const r = await api.orderCsv(d.id, e.target.files[0]); notify(`Matched order ${r.matched['Order ID'] || ''} in the CSV`, 'success'); reload() } catch (err) { notify(err.message, 'error') }
         e.target.value = ''
       }} />
+      {closed ? (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          This dispute is {d.status === 'RESOLVED' ? 'resolved' : 'under review'} on PayPal, so no new evidence can be added.
+        </div>
+      ) : (<>
       {d.sample_set === 'starter' && d.evidence.length === 0 && (
         <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">
           <b>No evidence yet — on purpose.</b> This demo case shows a brand-new dispute.
@@ -244,6 +251,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
           </div>
         )}
       </div>
+      </>)}
 
       {d.evidence.length > 0 && (
         <>
@@ -377,6 +385,9 @@ export default function Dispute() {
   if (!d) return <div className="flex items-center gap-2 text-slate-500"><Spinner /> Loading dispute…</div>
 
   const open = d.status === 'WAITING_FOR_SELLER_RESPONSE'
+  // Past disputes seeded for the Analytics page store only a final score, not claims or a report.
+  const history = a?.engine === 'seeded history'
+  const full = a && !history
   const urgent = open && d.days_left <= 3
   const rec = a?.recommendation
   const pendingConfirm = d.evidence.some((e) => e.facts.some((f) => f.needs_confirmation && !f.confirmed))
@@ -454,7 +465,18 @@ export default function Dispute() {
       )}
 
       {/* Pipeline progress / timeline */}
-      {(working || a) && (
+      {history && (
+        <div className="card border-slate-300 bg-slate-50 px-5 py-4 text-sm text-slate-700">
+          <div className="font-bold text-slate-900">Past dispute (history)</div>
+          This dispute was resolved on PayPal before this demo
+          {d.outcome && <> and was <b>{d.outcome === 'won' ? 'won by the merchant' : 'lost (buyer refunded)'}</b></>}.
+          It is part of the seeded history behind the <b>Analytics</b> page, so only its final evidence-strength score
+          (<b>{a.strength_label} {a.strength_score}/10</b>) is stored, not a claim-by-claim analysis.
+          Try an open dispute in the Inbox to see ClaimCheck at work.
+        </div>
+      )}
+
+      {(working || full) && (
         <div className="card px-5 py-3">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {PIPELINE.map((name, i) => {
@@ -471,7 +493,7 @@ export default function Dispute() {
               )
             })}
           </div>
-          {a && !working && (
+          {full && !working && (
             <div className="mt-2 text-xs text-slate-500">
               Engine: <b>{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b>Render Workflow</b> ({d.analysis_run_id})</> : (d.analysis_engine || 'in-process')} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
               {elapsed != null && <> · <b className="text-emerald-700">defence drafted in {elapsed.toFixed(1)} s</b> (vs ~20 min by hand)</>}
@@ -488,7 +510,7 @@ export default function Dispute() {
             “{d.buyer_message}”
             <div className="mt-2 text-xs text-slate-500">— {d.buyer}, via PayPal</div>
           </blockquote>
-          {a ? (
+          {full ? (
             <ol className="mt-4 space-y-2">
               {a.results.map((r, i) => (
                 <li key={r.claim_id}>
@@ -501,9 +523,9 @@ export default function Dispute() {
                 </li>
               ))}
             </ol>
-          ) : (
+          ) : open ? (
             <p className="mt-4 text-sm text-slate-500">Add evidence, then press <b>Generate AI Defence</b>. ClaimCheck splits this message into separate claims and checks each one.</p>
-          )}
+          ) : null}
         </Section>
 
         {/* Right: evidence */}
@@ -513,7 +535,7 @@ export default function Dispute() {
       </div>
 
       {/* Middle: claim vs evidence */}
-      {a && (
+      {full && (
         <Section title="Claim vs evidence" right={<span className="text-xs text-slate-500">Expand a row to see the cited facts · click to highlight the files</span>}>
           <div>
             <AgGridReact
@@ -536,7 +558,7 @@ export default function Dispute() {
       )}
 
       {/* Bottom: gaps, strength, report */}
-      {a && (
+      {full && (
         <div className="grid gap-5 xl:grid-cols-12">
           <div className="space-y-5 xl:col-span-5">
             <Section title="Evidence strength">

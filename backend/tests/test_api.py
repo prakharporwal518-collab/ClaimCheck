@@ -93,3 +93,14 @@ def test_starter_case_imports_the_sample_order_csv(client):
     assert len(r["added"]) == 1 and r["matched"]["Order ID"] == "INV-10547"
     assert client.post("/api/disputes/PP-D-48455/evidence/sample").json()["added"] == []  # not twice
     client.post("/api/demo/reset")
+
+
+def test_closed_and_history_disputes_take_no_evidence(client):
+    client.post("/api/demo/reset")
+    for dispute_id in ["PP-D-47186"]:  # a resolved history dispute
+        r = client.post(f"/api/disputes/{dispute_id}/evidence",
+                        files=[("files", ("t.pdf", open("sample_evidence/strong/tracking.pdf", "rb").read(), "application/pdf"))])
+        assert r.status_code == 409
+        assert client.post(f"/api/disputes/{dispute_id}/evidence/sample", json={"scenario": "strong"}).status_code == 409
+    d = client.get("/api/disputes/PP-D-47186").json()
+    assert d["analysis"]["engine"] == "seeded history" and d["evidence"] == []
