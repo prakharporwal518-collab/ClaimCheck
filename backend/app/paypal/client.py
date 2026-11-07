@@ -215,14 +215,37 @@ class MockClient(PayPalClient):
         return {"links": [{"href": f"/v1/customer/disputes/{dispute_id}", "rel": "self"}]}
 
 
-_client: PayPalClient | None = None
+_clients: dict[str, PayPalClient] = {}
 
 
-def get_client() -> PayPalClient:
-    global _client
-    if _client is None:
-        _client = SandboxClient() if settings.paypal_mode == "sandbox" else MockClient()
-    return _client
+def enabled_sources() -> list[str]:
+    """Which PayPal sources this deployment uses.
+
+    PAYPAL_MODE=mock      -> seeded demo disputes only
+    PAYPAL_MODE=sandbox   -> real PayPal Sandbox only
+    PAYPAL_MODE=hybrid    -> both in one inbox (Sandbox only when credentials are set)
+    """
+    mode = settings.paypal_mode
+    has_keys = bool(settings.paypal_client_id and settings.paypal_client_secret)
+    if mode == "sandbox":
+        return ["sandbox"]
+    if mode == "hybrid":
+        return ["mock", "sandbox"] if has_keys else ["mock"]
+    return ["mock"]
+
+
+def get_client(source: str | None = None) -> PayPalClient:
+    """The client for one source ("mock" or "sandbox"); default: the main source."""
+    source = source or enabled_sources()[0]
+    if source not in enabled_sources():
+        raise PayPalError(f"PayPal source '{source}' is not enabled on this server", 400)
+    if source not in _clients:
+        _clients[source] = SandboxClient() if source == "sandbox" else MockClient()
+    return _clients[source]
+
+
+def reset_mock_client() -> None:
+    _clients.pop("mock", None)
 
 
 # --------------------------------------------------------------------------

@@ -31,7 +31,7 @@ from .db import (
     init_db,
 )
 from .paypal import mock_data
-from .paypal.client import MockClient, PayPalError, get_client
+from .paypal.client import PayPalError, enabled_sources, get_client, reset_mock_client
 from .pipeline import extract as extract_mod
 from .pipeline import llm
 from .pipeline.analyse import extract_group, plan_groups
@@ -65,10 +65,10 @@ def _startup() -> None:
     init_db()
     with SessionLocal() as s:
         if s.query(Dispute).count() == 0:
-            try:
-                sync.sync_all(s, get_client())
-            except Exception as e:  # wrong PayPal keys must not stop the app from starting
-                log.error("Could not sync disputes from PayPal at startup: %s", e)
+            # Wrong PayPal keys must not stop the app from starting: errors are per source.
+            for src, r in sync.sync_sources(s, enabled_sources()).items():
+                if "error" in r:
+                    log.error("Could not sync %s disputes at startup: %s", src, r["error"])
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +169,8 @@ def health():
     return {
         "ok": True,
         "paypal_mode": settings.paypal_mode,
+        "paypal_sources": enabled_sources(),
+        "sandbox_actions_locked": bool(settings.sandbox_actions_key),
         "paypal_disputes_path": settings.paypal_disputes_path,
         "gemini": settings.gemini_enabled,
         "gemini_model": settings.gemini_model if settings.gemini_enabled else None,
@@ -217,11 +219,16 @@ def list_disputes():
 @app.post("/api/disputes/sync")
 def sync_disputes():
     with SessionLocal() as s:
-        try:
-            return sync.sync_all(s, get_client())
-        except PayPalError as e:
-            hint = " Check PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET." if e.status == 401 else ""
-            raise HTTPException(502, f"PayPal error: {e} ({e.status}) {e.body}.{hint}")
+        results = sync.sync_sources(s, enabled_sources())
+        errors = {k: v["error"] for k, v in results.items() if "error" in v}
+        if errors and len(errors) == len(results):
+            raise HTTPException(502, "PayPal error: " + "; ".join(f"{k}: {v}" for k, v in errors.items()))
+        return {
+            "listed": sum(v.get("listed", 0) for v in results.values()),
+            "new": sum(v.get("new", 0) for v in results.values()),
+            "mode": "+".join(results),
+            "sources": results,
+        }
 
 
 @app.get("/api/disputes/{dispute_id}")
@@ -445,12 +452,23 @@ def _carrier(analysis: Analysis) -> str:
     return "OTHER"
 
 
+def _client_for(d: Dispute, actions_key: str | None):
+    """The PayPal client for this dispute's own source, with the optional Sandbox lock."""
+    if d.source == "sandbox" and settings.sandbox_actions_key and actions_key != settings.sandbox_actions_key:
+        raise HTTPException(403, "This is a real PayPal Sandbox dispute: enter the Sandbox action key to continue")
+    try:
+        return get_client(d.source or "mock")
+    except PayPalError as e:
+        raise HTTPException(409, str(e))
+
+
 @app.post("/api/disputes/{dispute_id}/submit")
-def submit(dispute_id: str, body: SubmitIn):
+def submit(dispute_id: str, body: SubmitIn, request: Request):
     if not body.approved:
         raise HTTPException(400, "The merchant must review and approve the report before it is sent")
     with SessionLocal() as s:
         d = _get(s, dispute_id)
+        client = _client_for(d, request.headers.get("x-sandbox-key"))
         a = latest_analysis(d)
         if not a or not a.results:
             raise HTTPException(409, "Run the analysis first")
@@ -469,18 +487,18 @@ def submit(dispute_id: str, body: SubmitIn):
                       "notes": a.report_final[:2000]}]
         files = [(e.filename, e.data, e.mime) for e in d.evidence if e.mime in ALLOWED_MIME]
         try:
-            resp = get_client().provide_evidence(d.id, evidences, files)
+            resp = client.provide_evidence(d.id, evidences, files)
         except PayPalError as e:
             audit(s, d.id, "submit_failed", status=e.status, body=str(e.body)[:500])
             s.commit()
             raise HTTPException(502, f"PayPal rejected the submission ({e.status}): {e.body}")
         d.decision = "submitted"
         d.status = "UNDER_REVIEW"
-        audit(s, d.id, "submitted_to_paypal", mode=get_client().mode, files=len(files),
+        audit(s, d.id, "submitted_to_paypal", mode=client.mode, files=len(files),
               ai_draft=a.report_text, final=a.report_final, edited=a.report_text != a.report_final,
               request={"evidences": evidences}, response=resp)
         s.commit()
-        return {"ok": True, "mode": get_client().mode, "response": resp}
+        return {"ok": True, "mode": client.mode, "response": resp}
 
 
 class AcceptIn(BaseModel):
@@ -488,20 +506,21 @@ class AcceptIn(BaseModel):
 
 
 @app.post("/api/disputes/{dispute_id}/accept-claim")
-def accept_claim(dispute_id: str, body: AcceptIn):
+def accept_claim(dispute_id: str, body: AcceptIn, request: Request):
     with SessionLocal() as s:
         d = _get(s, dispute_id)
+        client = _client_for(d, request.headers.get("x-sandbox-key"))
         note = body.note or "We reviewed the carrier records and agree the item did not reach you. Refunding in full."
         try:
-            resp = get_client().accept_claim(d.id, note, get_playbook(d.reason)["accept_claim_reason"])
+            resp = client.accept_claim(d.id, note, get_playbook(d.reason)["accept_claim_reason"])
         except PayPalError as e:
             raise HTTPException(502, f"PayPal rejected accept-claim ({e.status}): {e.body}")
         d.decision = "refunded"
         d.status = "RESOLVED"
         d.outcome = "lost"
-        audit(s, d.id, "accepted_claim", mode=get_client().mode, note=note, response=resp)
+        audit(s, d.id, "accepted_claim", mode=client.mode, note=note, response=resp)
         s.commit()
-        return {"ok": True, "mode": get_client().mode, "response": resp}
+        return {"ok": True, "mode": client.mode, "response": resp}
 
 
 @app.get("/api/disputes/{dispute_id}/report.pdf")
@@ -519,13 +538,13 @@ def report_pdf(dispute_id: str):
 # ---------------------------------------------------------------------------
 # Webhooks: the "agent" path
 # ---------------------------------------------------------------------------
-async def handle_webhook_event(event: dict) -> dict:
+async def handle_webhook_event(event: dict, source: str | None = None) -> dict:
     etype = event.get("event_type", "")
     resource = event.get("resource") or {}
     dispute_id = resource.get("dispute_id")
     if not dispute_id:
         return {"ignored": etype}
-    client = get_client()
+    client = get_client(source)
     with SessionLocal() as s:
         detail = client.get_dispute(dispute_id)
         d, created = sync.upsert_dispute(s, client, detail)
@@ -541,40 +560,48 @@ async def handle_webhook_event(event: dict) -> dict:
 @app.post("/api/webhooks/paypal")
 async def paypal_webhook(request: Request):
     event = await request.json()
-    client = get_client()
+    # Real PayPal webhooks come from the Sandbox when it is enabled.
+    source = "sandbox" if "sandbox" in enabled_sources() else enabled_sources()[0]
+    client = get_client(source)
     try:
         ok = client.verify_webhook(dict(request.headers), event)
     except PayPalError as e:
         raise HTTPException(400, f"Webhook verification error: {e}")
     if not ok:
         raise HTTPException(400, "Webhook signature verification failed")
-    return await handle_webhook_event(event)
+    return await handle_webhook_event(event, source)
 
 
 @app.post("/api/demo/simulate-dispute")
 async def simulate_dispute():
-    client = get_client()
-    if not isinstance(client, MockClient):
-        raise HTTPException(400, "Only available in mock mode; in sandbox, open a real dispute as the buyer")
+    if "mock" not in enabled_sources():
+        raise HTTPException(400, "Only available with demo data; in sandbox, open a real dispute as the buyer")
+    client = get_client("mock")
     detail = mock_data.simulated_new_dispute()
     client.add(detail)
     event = {"event_type": "CUSTOMER.DISPUTE.CREATED", "resource": {"dispute_id": detail["dispute_id"]},
              "summary": "A new dispute was opened (simulated)"}
-    return await handle_webhook_event(event)
+    return await handle_webhook_event(event, "mock")
 
 
 @app.post("/api/demo/reset")
 def reset_demo():
-    global_client = get_client()
-    if not isinstance(global_client, MockClient):
-        raise HTTPException(400, "Only available in mock mode")
-    Base.metadata.drop_all(engine)
-    init_db()
-    from .paypal import client as client_mod
-
-    client_mod._client = None
+    """Reset the demo data. PayPal Sandbox disputes (and their evidence) are kept."""
+    if "mock" not in enabled_sources():
+        raise HTTPException(400, "Only available with demo data")
+    reset_mock_client()
+    if enabled_sources() == ["mock"]:
+        Base.metadata.drop_all(engine)
+        init_db()
+    else:
+        with SessionLocal() as s:
+            ids = [d.id for d in s.query(Dispute).filter(Dispute.source != "sandbox")]
+            for d in s.query(Dispute).filter(Dispute.id.in_(ids)):
+                s.delete(d)  # cascades to evidence and analyses
+            s.query(AuditLog).filter(AuditLog.dispute_id.in_(ids)).delete(synchronize_session=False)
+            s.commit()
     with SessionLocal() as s:
-        return sync.sync_all(s, get_client())
+        return sync.sync_all(s, get_client("mock"))
 
 
 # ---------------------------------------------------------------------------
@@ -589,6 +616,7 @@ def analytics():
             created = d.created_at or datetime.utcnow()
             rows.append({
                 "dispute_id": d.id,
+                "source": "PayPal Sandbox" if d.source == "sandbox" else "Demo data",
                 "buyer": d.buyer_name,
                 "item": d.item_title,
                 "amount": d.amount,

@@ -42,6 +42,20 @@ def upsert_dispute(s, client: PayPalClient, detail: dict) -> tuple[Dispute, bool
     return d, created
 
 
+def sync_sources(s, sources: list[str]) -> dict:
+    """Sync every enabled source; one failing source does not stop the others."""
+    from .paypal.client import get_client
+
+    results = {}
+    for src in sources:
+        try:
+            results[src] = sync_all(s, get_client(src))
+        except Exception as e:
+            s.rollback()
+            results[src] = {"error": str(e)[:300], "mode": src}
+    return results
+
+
 def sync_all(s, client: PayPalClient) -> dict:
     items = client.list_disputes()
     new = 0
