@@ -257,7 +257,10 @@ FACT_SYSTEM = (
     "masked buyer details; keep them as-is. Each fact must be one sentence, quote the evidence "
     "where possible, and use one of the given kinds. Use polarity 'supports_merchant' when the fact "
     "shows the item was delivered or the seller responded, 'supports_buyer' when it shows the item "
-    "was not delivered, else 'neutral'. Return at most 8 facts."
+    "was not delivered, else 'neutral'. Use the kinds signature, delivery_photo, carrier_delivered and "
+    "buyer_confirmation ONLY when the evidence shows that proof exists. If the evidence says it is missing "
+    "or failed (e.g. 'no proof of delivery captured', 'not signed', 'returned to sender'), use 'other' or "
+    "'carrier_failed' instead. Return at most 8 facts."
 )
 
 
@@ -471,3 +474,25 @@ def extract_evidence(evidence, dispute, merchant, playbook: dict) -> None:
 
 def now_iso() -> str:
     return datetime.utcnow().isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Guard: a fact that says a proof is MISSING must never count as that proof
+# ---------------------------------------------------------------------------
+_MISSING_PROOF = {
+    "signature": re.compile(
+        r"\bno (?:proof|signature|pod)\b|not (?:signed|captured|available|required)|without (?:a )?signature|"
+        r"unsigned|missing|no proof of delivery", re.I),
+    "delivery_photo": re.compile(r"\bno (?:photo|image|proof)\b|not (?:captured|available|taken)|missing|without", re.I),
+    "carrier_delivered": re.compile(
+        r"not delivered|undelivered|delivery (?:failed|exception)|returned to sender|\bRTS\b", re.I),
+    "buyer_confirmation": NEGATION_RE,
+}
+
+
+def proof_is_missing(fact: dict) -> bool:
+    """True when a fact labelled as proof actually says the proof is missing or failed."""
+    pattern = _MISSING_PROOF.get(fact.get("kind", ""))
+    if not pattern:
+        return False
+    return bool(pattern.search(fact.get("fact", ""))) or fact.get("polarity") == "supports_buyer"

@@ -34,3 +34,50 @@ def test_buyer_typed_quotes_are_stripped():
     detail = {"dispute_id": "PP-R-1", "messages": [
         {"posted_by": "BUYER", "content": '"I never received the headphones."'}]}
     assert normalise_dispute(detail)["buyer_message"] == "I never received the headphones."
+
+
+def test_missing_proof_is_never_counted_as_proof():
+    from app.pipeline.extract import proof_is_missing
+
+    assert proof_is_missing({"kind": "signature", "fact": "The tracking details state 'No proof of delivery captured'"})
+    assert proof_is_missing({"kind": "signature", "fact": "Signature not required"})
+    assert proof_is_missing({"kind": "carrier_delivered", "fact": "Status: Returned to sender"})
+    assert proof_is_missing({"kind": "buyer_confirmation", "fact": "Buyer wrote 'parcel nahi mila'"})
+    assert not proof_is_missing({"kind": "signature", "fact": "Signed by: [BUYER] at 3 Nov 2026 14:07"})
+    assert not proof_is_missing({"kind": "carrier_delivered", "fact": "Delivered, left at front porch"})
+    assert not proof_is_missing({"kind": "delivery_photo", "fact": "Photo shows a parcel at door 418"})
+
+
+def test_weak_case_stays_medium_when_model_mislabels_missing_signature(client, monkeypatch):
+    """Live site: Gemini labelled 'No proof of delivery captured' as a signature, so the weak case
+    scored High 7/10 with 0 critical gaps instead of Medium with the signature gap."""
+    from app.config import settings
+    from app.pipeline import llm as llm_mod
+
+    from .conftest import wait_for_analysis
+
+    def fake(*, step, system, prompt, images=None, schema=None, dispute_id=""):
+        if step == "extract_batch":
+            return {"facts": [
+                {"file": 0, "kind": "tracking_number", "fact": "Tracking number SPX4837710442", "date": "", "polarity": "neutral"},
+                {"file": 0, "kind": "carrier_delivered", "fact": "Delivered, left at front porch", "date": "21 Oct", "polarity": "supports_merchant"},
+                {"file": 0, "kind": "signature", "fact": "The tracking details state 'No proof of delivery captured for this shipment'", "date": "", "polarity": "neutral"},
+                {"file": 1, "kind": "order", "fact": "Invoice INV-10511 for USD 89.99", "date": "", "polarity": "neutral"},
+            ]}, "fake"
+        if step == "claims":
+            return {"claims": [{"text": "My package never showed up", "type": "not_received", "against_seller": True}]}, "fake"
+        if step == "crosscheck":
+            return {"results": [{"claim": "c1", "status": "contradicted", "evidence": ["e2"], "why": "Delivered."}]}, "fake"
+        return {"summary": "s", "rebuttal": [], "closing": "c"}, "fake"
+
+    monkeypatch.setattr(settings, "gemini_api_key", "k")
+    monkeypatch.setattr(llm_mod, "generate_json", fake)
+    client.post("/api/demo/reset")
+    client.post("/api/disputes/PP-D-48377/evidence/sample")
+    client.post("/api/disputes/PP-D-48377/analyse")
+    a = wait_for_analysis(client, "PP-D-48377")["analysis"]
+    gaps = {g["id"]: g["missing"] for g in a["gaps"]}
+    assert gaps["signature_or_photo"] is True
+    assert a["strength_label"] == "Medium"
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    client.post("/api/demo/reset")

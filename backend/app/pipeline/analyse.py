@@ -441,19 +441,26 @@ def run_analysis(dispute_id: str, *, extract_parallel: bool = True) -> dict:
             # Integrity check + numbered facts.
             st = time.time()
             integ = integrity.check(d, evidence)
-            facts, skipped = [], 0
+            facts, skipped, reclassified = [], 0, 0
             for ev in evidence:
                 for f in ev.facts or []:
                     if f.get("needs_confirmation") and not f.get("confirmed"):
                         skipped += 1
                         continue
-                    facts.append({**f, "id": f"e{len(facts) + 1}"})
+                    f = {**f, "id": f"e{len(facts) + 1}"}
+                    if extract_mod.proof_is_missing(f):
+                        # e.g. "No proof of delivery captured" labelled as a signature by the model
+                        f["kind"] = "carrier_failed" if f["kind"] == "carrier_delivered" else "other"
+                        f["note"] = "reclassified: says this proof is missing"
+                        reclassified += 1
+                    facts.append(f)
             if integ["address_match"]:
                 facts.append({"id": f"e{len(facts) + 1}", "kind": "address_match", "source": "integrity check",
                               "evidence_id": None, "fact": "Tracking delivery address matches the PayPal shipping address",
                               "date": "", "polarity": "supports_merchant"})
             step("Integrity check + number facts", st,
-                 f"{len(facts)} facts, {skipped} awaiting merchant confirmation", "code")
+                 f"{len(facts)} facts, {skipped} awaiting merchant confirmation"
+                 + (f", {reclassified} reclassified (they say a proof is missing)" if reclassified else ""), "code")
 
             # 0. Mask the buyer's message.
             st = time.time()
