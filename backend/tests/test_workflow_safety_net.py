@@ -113,3 +113,4 @@ def test_claim_run_is_exclusive(client):
     assert claim_run(DISPUTE, "render-workflows") is True
     assert claim_run(DISPUTE, "render-workflows") is False   # already running
     assert claim_run(DISPUTE, "in-process") is False
+    client.post("/api/demo/reset")  # don't leave the dispute "running" for later tests
