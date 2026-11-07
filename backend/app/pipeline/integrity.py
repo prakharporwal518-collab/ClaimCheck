@@ -20,6 +20,13 @@ def check(dispute, evidence_list) -> dict:
     tracking: dict[str, set[int]] = {}
     orders: dict[str, set[int]] = {}
     summary_checks: list[dict] = []
+    has_shipping = bool((dispute.shipping_address or {}).get("address_line_1"))
+    if not has_shipping:
+        summary_checks.append({
+            "ok": False,
+            "text": "Delivery address not checked: PayPal did not include a shipping address for this dispute "
+                    "(import the order CSV to add it)",
+        })
 
     for ev in evidence_list:
         text = ev.text_masked or ""
@@ -41,7 +48,9 @@ def check(dispute, evidence_list) -> dict:
                                   f"don't include the disputed ${dispute.amount:.2f}")
             elif amounts:
                 oks.append(f"Amount ${dispute.amount:.2f} matches the PayPal transaction")
-        if ev.tag == "Tracking":
+        if ev.tag == "Tracking" and not has_shipping:
+            pass  # nothing to compare against (see the summary check above)
+        elif ev.tag == "Tracking":
             if "[ADDRESS]" in text:
                 oks.append("Delivery address matches the PayPal shipping address")
             elif re.search(r"deliver(?:ed|y)? to|ship to|address", text, re.I):

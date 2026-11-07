@@ -243,7 +243,10 @@ def normalise_dispute(detail: dict) -> dict:
     buyer = tx.get("buyer") or {}
     amount = detail.get("dispute_amount") or tx.get("gross_amount") or {}
     messages = detail.get("messages") or []
-    buyer_msgs = [m.get("content", "") for m in messages if m.get("posted_by") == "BUYER"]
+    buyer_msgs = [
+        (m.get("content") or "").strip().strip('"\u201c\u201d').strip()  # buyers often type their own quotes
+        for m in messages if m.get("posted_by") == "BUYER"
+    ]
     outcome_code = (detail.get("dispute_outcome") or {}).get("outcome_code", "")
     outcome = ""
     if "SELLER_FAVOUR" in outcome_code:
