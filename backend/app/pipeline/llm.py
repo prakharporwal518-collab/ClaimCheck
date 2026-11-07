@@ -202,10 +202,25 @@ def studio_turn(req: dict) -> dict:
             s.add(PromptLog(step="studio_chat", model=settings.gemini_model, prompt=json.dumps(body)[:20000]))
             s.commit()
 
-    try:
-        raw = _call(settings.gemini_model, body)
-    except LlmUnavailable as e:
-        return {"output": [_text_item(f"The AI model is unavailable right now ({e}).")], "status": "failed"}
+    raw, used_model, errors = None, settings.gemini_model, []
+    models = [settings.gemini_model]
+    if settings.gemini_fallback_model and settings.gemini_fallback_model != settings.gemini_model:
+        models.append(settings.gemini_fallback_model)  # same safety net as the analysis pipeline
+    for model in models:
+        try:
+            raw, used_model = _call(model, body), model
+            break
+        except LlmUnavailable as e:
+            errors.append(str(e))
+    if raw is None:
+        if any("429" in e for e in errors):
+            msg = ("The free Gemini quota is used up for now (too many AI requests today). "
+                   "Please try again in a few minutes, or tomorrow when the daily quota resets. "
+                   "The dashboard and filters still work without the AI assistant.")
+        else:
+            msg = "The AI model is unavailable right now. Please try again in a minute."
+        log.warning("Studio AI turn failed: %s", " | ".join(errors)[:500])
+        return {"output": [_text_item(msg)], "status": "completed"}
 
     output: list[dict] = []
     for part in raw.get("candidates", [{}])[0].get("content", {}).get("parts", []):
@@ -232,7 +247,7 @@ def studio_turn(req: dict) -> dict:
     return {
         "output": output or [_text_item("(no answer)")],
         "status": "completed",
-        "model": settings.gemini_model,
+        "model": used_model,
         "usage": {
             "inputTokens": usage.get("promptTokenCount", 0),
             "outputTokens": usage.get("candidatesTokenCount", 0),
