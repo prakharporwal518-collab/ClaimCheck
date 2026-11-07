@@ -666,7 +666,7 @@ def analytics():
                 "item": d.item_title,
                 "amount": d.amount,
                 "status": "Open" if d.status == "WAITING_FOR_SELLER_RESPONSE" else
-                          "Under review" if d.status == "UNDER_REVIEW" else "Resolved",
+                          "Resolved" if d.status == "RESOLVED" else "Under review",
                 "decision": {"open": "Pending", "submitted": "Fight", "refunded": "Refund"}.get(d.decision, d.decision),
                 "outcome": {"won": "Won", "lost": "Lost"}.get(d.outcome, "Pending"),
                 "score": r["score"],

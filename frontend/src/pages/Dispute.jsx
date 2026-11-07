@@ -209,7 +209,9 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
       }} />
       {closed ? (
         <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This dispute is {d.status === 'RESOLVED' ? 'resolved' : 'under review'} on PayPal, so no new evidence can be added.
+          {d.status === 'WAITING_FOR_BUYER_RESPONSE'
+            ? 'PayPal is waiting for the buyer to reply, so no new evidence can be added.'
+            : `This dispute is ${statusText(d.status).toLowerCase()} on PayPal, so no new evidence can be added.`}
         </div>
       ) : (<>
       {d.sample_set === 'starter' && d.evidence.length === 0 && (
@@ -453,8 +455,10 @@ export default function Dispute() {
 
       {d.source === 'sandbox' && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
-          <b>Real PayPal Sandbox dispute.</b> It was read from the PayPal Disputes API. <b>Submit</b> and <b>Refund</b> call
-          PayPal for real and can't be undone. The demo disputes are safe to play with.
+          <b>Real PayPal Sandbox dispute.</b> It was read from the PayPal Disputes API.
+          {open
+            ? <> <b>Submit</b> and <b>Refund</b> call PayPal for real and can't be undone. The demo disputes are safe to play with.</>
+            : <> Its current status comes straight from PayPal.</>}
         </div>
       )}
 

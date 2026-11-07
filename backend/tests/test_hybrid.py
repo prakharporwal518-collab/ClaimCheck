@@ -102,3 +102,25 @@ def test_simulated_webhook_still_uses_demo_data(client, hybrid):
     assert r["created"]
     row = next(d for d in client.get("/api/disputes").json() if d["id"] == r["dispute_id"])
     assert row["source"] == "mock"
+
+
+def test_paypal_statuses_set_the_decision(client, hybrid):
+    # Like the live data: one dispute waiting for the buyer after evidence, one resolved for the buyer.
+    hybrid._store["PP-R-VLC-10196953"]["status"] = "WAITING_FOR_BUYER_RESPONSE"
+    hybrid._store["PP-R-GQK-10196955"]["status"] = "RESOLVED"
+    hybrid._store["PP-R-GQK-10196955"]["dispute_outcome"] = {"outcome_code": "RESOLVED_BUYER_FAVOUR"}
+    client.post("/api/disputes/sync")
+    rows = {d["id"]: d for d in client.get("/api/disputes").json()}
+    assert rows["PP-R-VLC-10196953"]["decision"] == "submitted"
+    assert rows["PP-R-GQK-10196955"]["decision"] == "refunded"
+    assert rows["PP-R-GQK-10196955"]["outcome"] == "lost"
+    a = {r["dispute_id"]: r for r in client.get("/api/analytics").json()["rows"]}
+    assert a["PP-R-VLC-10196953"]["status"] == "Under review"
+    # A wrong earlier decision is corrected on the next sync (ClaimCheck has no record of acting)
+    from app.db import Dispute, SessionLocal
+
+    with SessionLocal() as s:
+        s.get(Dispute, "PP-R-GQK-10196955").decision = "submitted"
+        s.commit()
+    client.post("/api/disputes/sync")
+    assert client.get("/api/disputes/PP-R-GQK-10196955").json()["decision"] == "refunded"

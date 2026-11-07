@@ -11,7 +11,9 @@ export const daysLabel = (d) => {
 export const statusText = (s) =>
   ({
     WAITING_FOR_SELLER_RESPONSE: 'Needs response',
+    WAITING_FOR_BUYER_RESPONSE: 'Waiting for buyer',
     UNDER_REVIEW: 'Under review',
+    OTHER: 'With PayPal',
     RESOLVED: 'Resolved',
     OPEN: 'Open',
   })[s] || s
