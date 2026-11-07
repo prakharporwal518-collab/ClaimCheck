@@ -1,0 +1,21 @@
+{
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+  "label": "Not as Described",
+  "status": "stub",
+  "note": "Stub playbook: shows that adding a reason is configuration, not a rewrite. Not used in the MVP.",
+  "claim_types": {
+    "damaged": "Buyer says the item arrived damaged",
+    "wrong_item": "Buyer says they received a different item",
+    "missing_parts": "Buyer says parts were missing",
+    "other": "Any other factual statement"
+  },
+  "checklist": [
+    {"id": "listing", "label": "Product listing or description at time of sale", "critical": true, "satisfied_by": ["listing"]},
+    {"id": "packing_photo", "label": "Photo of the item before shipping", "critical": true, "satisfied_by": ["packing_photo"]},
+    {"id": "return_policy", "label": "Return policy shown to the buyer", "critical": false, "satisfied_by": ["policy"]}
+  ],
+  "strong_evidence_kinds": ["listing", "packing_photo"],
+  "extraction_hints": ["product specs", "condition before shipping"],
+  "accept_claim_reason": "COMPANY_POLICY",
+  "paypal_evidence_type": "OTHER"
+}

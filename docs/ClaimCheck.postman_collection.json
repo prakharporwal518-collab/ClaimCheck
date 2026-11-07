@@ -1,0 +1,399 @@
+{
+  "info": {
+    "name": "ClaimCheck API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "ClaimCheck backend. Set baseUrl to http://localhost:8000 or your Render URL."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "disputeId",
+      "value": "PP-D-48213"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "PayPal mode, AI model, Render Workflows, OCR"
+      }
+    },
+    {
+      "name": "List disputes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "Sync from PayPal",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/sync",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "sync"
+          ]
+        },
+        "description": "Calls GET /v1/customer/disputes and /{id}"
+      }
+    },
+    {
+      "name": "Get dispute",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "Upload evidence",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/evidence",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "evidence"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "files",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "tags",
+              "value": "Tracking",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Load sample evidence",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/evidence/sample",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "evidence",
+            "sample"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "Retag evidence",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/evidence/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "evidence",
+            "1"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tag\": \"Delivery photo\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Import order CSV",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/order-csv",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "order-csv"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Run analysis",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/analyse",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "analyse"
+          ]
+        },
+        "description": "Starts a Render Workflow run or the in-process pipeline"
+      }
+    },
+    {
+      "name": "Save report edits",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/report",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "report"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Edited defence...\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Submit to PayPal (provide-evidence)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/submit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "submit"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"approved\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Accept claim (refund)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/PP-D-48402/accept-claim",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "PP-D-48402",
+            "accept-claim"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"note\": \"Refunding in full.\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Export PDF",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/disputes/{{disputeId}}/report.pdf",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "disputes",
+            "{{disputeId}}",
+            "report.pdf"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "PayPal webhook",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/webhooks/paypal",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "webhooks",
+            "paypal"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"CUSTOMER.DISPUTE.CREATED\",\n  \"resource\": {\n    \"dispute_id\": \"PP-D-48455\"\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "Simulate new dispute (mock)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/demo/simulate-dispute",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "demo",
+            "simulate-dispute"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "Analytics rows",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/analytics",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "analytics"
+          ]
+        },
+        "description": ""
+      }
+    }
+  ]
+}
