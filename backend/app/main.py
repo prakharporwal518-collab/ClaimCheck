@@ -276,6 +276,9 @@ def _extract_async(ids: list[int]) -> None:
 
 
 def _add_evidence(s, d: Dispute, filename: str, data: bytes, mime: str, tag: str) -> Evidence:
+    if d.status != "WAITING_FOR_SELLER_RESPONSE":
+        raise HTTPException(409, "This dispute is closed on PayPal (under review or resolved), "
+                                 "so no new evidence can be added")
     if mime not in ALLOWED_MIME and mime != "text/csv":
         raise HTTPException(415, f"{filename}: only PDF, PNG and JPG files are accepted")
     if len(data) > settings.max_file_mb * 1024 * 1024:
