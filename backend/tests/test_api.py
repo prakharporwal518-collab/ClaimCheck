@@ -71,3 +71,15 @@ def test_analytics_rows(client):
     rows = client.get("/api/analytics").json()["rows"]
     assert len(rows) >= 12
     assert {"money_at_risk", "strength", "outcome"} <= set(rows[0])
+
+
+def test_settings_ignore_pasted_whitespace_and_quotes(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.setenv("PAYPAL_CLIENT_ID", "  AbC123\n")
+    monkeypatch.setenv("PAYPAL_CLIENT_SECRET", '"EfG456" ')
+    monkeypatch.setenv("PAYPAL_MODE", " Hybrid\n")
+    s = Settings()
+    assert s.paypal_client_id == "AbC123"
+    assert s.paypal_client_secret == "EfG456"
+    assert s.paypal_mode == "hybrid"
