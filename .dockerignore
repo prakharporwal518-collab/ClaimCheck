@@ -4,3 +4,6 @@
 **/__pycache__
 backend/data
 .git
+backend/data-*
+backend/static
+**/.pytest_cache

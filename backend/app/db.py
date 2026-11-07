@@ -25,8 +25,12 @@ def utcnow() -> datetime:
 
 
 _url = settings.database_url
-if _url.startswith("postgres://"):  # Render gives postgres://, SQLAlchemy wants postgresql://
-    _url = _url.replace("postgres://", "postgresql://", 1)
+# Render gives postgres://...; SQLAlchemy 2.1 maps plain postgresql:// to the psycopg 3 driver,
+# so name the driver we install (psycopg2-binary) explicitly.
+for prefix in ("postgres://", "postgresql://"):
+    if _url.startswith(prefix):
+        _url = "postgresql+psycopg2://" + _url[len(prefix):]
+        break
 _connect_args = {"check_same_thread": False} if _url.startswith("sqlite") else {}
 engine = create_engine(_url, connect_args=_connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -46,20 +50,20 @@ class Dispute(Base):
     stage: Mapped[str] = mapped_column(String(32), default="INQUIRY")
     amount: Mapped[float] = mapped_column(Float)
     currency: Mapped[str] = mapped_column(String(8), default="USD")
-    buyer_name: Mapped[str] = mapped_column(String(128), default="")
-    buyer_email: Mapped[str] = mapped_column(String(128), default="")
+    buyer_name: Mapped[str] = mapped_column(Text, default="")
+    buyer_email: Mapped[str] = mapped_column(Text, default="")
     buyer_message: Mapped[str] = mapped_column(Text, default="")
     messages: Mapped[list] = mapped_column(JSON, default=list)
     shipping_address: Mapped[dict] = mapped_column(JSON, default=dict)
-    item_title: Mapped[str] = mapped_column(String(256), default="")
-    order_id: Mapped[str] = mapped_column(String(64), default="")
-    transaction_id: Mapped[str] = mapped_column(String(64), default="")
+    item_title: Mapped[str] = mapped_column(Text, default="")
+    order_id: Mapped[str] = mapped_column(String(128), default="")
+    transaction_id: Mapped[str] = mapped_column(String(128), default="")
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # ClaimCheck workflow state
     analysis_state: Mapped[str] = mapped_column(String(16), default="idle")  # idle|queued|running|done|error
     analysis_engine: Mapped[str] = mapped_column(String(32), default="")  # in-process | render-workflows
-    analysis_run_id: Mapped[str] = mapped_column(String(128), default="")
+    analysis_run_id: Mapped[str] = mapped_column(Text, default="")
     analysis_error: Mapped[str] = mapped_column(Text, default="")
     decision: Mapped[str] = mapped_column(String(16), default="open")  # open|submitted|refunded
     outcome: Mapped[str] = mapped_column(String(16), default="")  # won|lost|"" (from RESOLVED)
@@ -80,7 +84,7 @@ class Evidence(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     dispute_id: Mapped[str] = mapped_column(ForeignKey("disputes.id"))
-    filename: Mapped[str] = mapped_column(String(256))
+    filename: Mapped[str] = mapped_column(Text)
     mime: Mapped[str] = mapped_column(String(64))
     size: Mapped[int] = mapped_column(Integer)
     data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
@@ -89,7 +93,7 @@ class Evidence(Base):
     text_masked: Mapped[str] = mapped_column(Text, default="")
     ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     sent_to_vision: Mapped[bool] = mapped_column(Boolean, default=False)
-    extractor: Mapped[str] = mapped_column(String(48), default="")
+    extractor: Mapped[str] = mapped_column(Text, default="")
     facts: Mapped[list] = mapped_column(JSON, default=list)
     integrity: Mapped[dict] = mapped_column(JSON, default=dict)
     pii_map: Mapped[dict] = mapped_column(JSON, default=dict)  # placeholder -> real value (server only)
@@ -113,10 +117,10 @@ class Analysis(Base):
     report_final: Mapped[str] = mapped_column(Text, default="")  # merchant-edited version
     strength_label: Mapped[str] = mapped_column(String(16), default="")
     strength_score: Mapped[int] = mapped_column(Integer, default=0)
-    strength_line: Mapped[str] = mapped_column(String(256), default="")
+    strength_line: Mapped[str] = mapped_column(Text, default="")
     score_breakdown: Mapped[list] = mapped_column(JSON, default=list)
     recommendation: Mapped[dict] = mapped_column(JSON, default=dict)
-    engine: Mapped[str] = mapped_column(String(64), default="")
+    engine: Mapped[str] = mapped_column(Text, default="")
     steps: Mapped[list] = mapped_column(JSON, default=list)
     cache_key: Mapped[str] = mapped_column(String(64), default="")
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
@@ -152,7 +156,7 @@ class LlmCache(Base):
     __tablename__ = "llm_cache"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    model: Mapped[str] = mapped_column(String(64))
+    model: Mapped[str] = mapped_column(Text)
     response: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -165,7 +169,7 @@ class PromptLog(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     dispute_id: Mapped[str] = mapped_column(String(64), default="")
     step: Mapped[str] = mapped_column(String(32))
-    model: Mapped[str] = mapped_column(String(64))
+    model: Mapped[str] = mapped_column(Text)
     prompt: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
