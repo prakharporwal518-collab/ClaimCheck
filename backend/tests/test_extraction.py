@@ -84,7 +84,8 @@ def test_small_documents_share_one_llm_call(monkeypatch):
            for i, (n, t) in enumerate([("tracking.pdf", "Tracking"), ("invoice.pdf", "Invoice")])]
     extract.extract_batch(evs, DISPUTE, MERCHANT, {"extraction_hints": []})
     assert steps == ["extract_batch"]  # two files, one call
-    assert [f["kind"] for f in evs[0].facts] == ["carrier_delivered"]
-    assert [f["kind"] for f in evs[1].facts] == ["order"]
+    assert evs[0].facts[0]["kind"] == "carrier_delivered"            # the model's fact comes first
+    assert "tracking_number" in [f["kind"] for f in evs[0].facts]    # rules backstop adds what it missed
+    assert evs[1].facts[0]["kind"] == "order"
     assert "batched x2" in evs[0].extractor
     assert "Rohan" not in json.dumps([e.text_masked for e in evs])  # masked before the call

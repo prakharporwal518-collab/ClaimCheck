@@ -81,3 +81,53 @@ def test_weak_case_stays_medium_when_model_mislabels_missing_signature(client, m
     assert a["strength_label"] == "Medium"
     monkeypatch.setattr(settings, "gemini_api_key", "")
     client.post("/api/demo/reset")
+
+
+def test_weak_case_is_medium_when_model_labels_delivered_scan_as_other(client, monkeypatch):
+    """Live site after the previous fix: Gemini labelled 'Delivered, left at front porch' as 'other',
+    so the weak case showed two critical gaps and scored Low 2/10 instead of Medium."""
+    from app.config import settings
+    from app.pipeline import llm as llm_mod
+
+    from .conftest import wait_for_analysis
+
+    def fake(*, step, system, prompt, images=None, schema=None, dispute_id=""):
+        if step == "extract_batch":
+            return {"facts": [
+                {"file": 0, "kind": "tracking_number", "fact": "Tracking number SPX4837710442", "date": "", "polarity": "neutral"},
+                {"file": 0, "kind": "other", "fact": "On 21 Oct 2026 at 16:20, the scan history status states 'Delivered, left at front porch'.", "date": "21 Oct", "polarity": "neutral"},
+                {"file": 0, "kind": "other", "fact": "The tracking record notes 'No proof of delivery captured for this shipment'.", "date": "", "polarity": "neutral"},
+            ]}, "fake"
+        if step == "claims":
+            return {"claims": [
+                {"text": "My package never showed up.", "type": "not_received", "against_seller": True},
+                {"text": "It's been three weeks and I still have nothing.", "type": "delayed", "against_seller": True}]}, "fake"
+        if step == "crosscheck":
+            return {"results": [
+                {"claim": "c1", "status": "contradicted", "evidence": ["e2"], "why": "Delivered."},
+                {"claim": "c2", "status": "contradicted", "evidence": ["e2"], "why": "Delivered."}]}, "fake"
+        return {"summary": "s", "rebuttal": [], "closing": "c"}, "fake"
+
+    monkeypatch.setattr(settings, "gemini_api_key", "k")
+    monkeypatch.setattr(llm_mod, "generate_json", fake)
+    client.post("/api/demo/reset")
+    client.post("/api/disputes/PP-D-48377/evidence/sample")
+    client.post("/api/disputes/PP-D-48377/analyse")
+    a = wait_for_analysis(client, "PP-D-48377")["analysis"]
+    missing = {g["id"] for g in a["gaps"] if g["missing"]}
+    assert "carrier_delivered" not in missing          # the Delivered scan counts
+    assert "signature_or_photo" in missing             # "No proof of delivery" does not
+    assert "invoice" not in missing                    # rules engine backstop found the invoice
+    assert a["strength_label"] == "Medium", a["strength_line"]
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    client.post("/api/demo/reset")
+
+
+def test_backstop_does_not_duplicate_kinds_the_model_found():
+    from app.pipeline.extract import backstop
+
+    llm_f = [{"kind": "carrier_delivered", "fact": "Delivered"}]
+    rules = [{"kind": "carrier_delivered", "fact": "Carrier status: Delivered"},
+             {"kind": "tracking_number", "fact": "Tracking number X1"}]
+    out = backstop(llm_f, rules)
+    assert [f["kind"] for f in out] == ["carrier_delivered", "tracking_number"]

@@ -258,7 +258,8 @@ FACT_SYSTEM = (
     "where possible, and use one of the given kinds. Use polarity 'supports_merchant' when the fact "
     "shows the item was delivered or the seller responded, 'supports_buyer' when it shows the item "
     "was not delivered, else 'neutral'. Use the kinds signature, delivery_photo, carrier_delivered and "
-    "buyer_confirmation ONLY when the evidence shows that proof exists. If the evidence says it is missing "
+    "buyer_confirmation ONLY when the evidence shows that proof exists. A carrier scan whose status is "
+    "'Delivered' (for example 'Delivered, left at front porch') IS carrier_delivered. If the evidence says it is missing "
     "or failed (e.g. 'no proof of delivery captured', 'not signed', 'returned to sender'), use 'other' or "
     "'carrier_failed' instead. Return at most 8 facts."
 )
@@ -382,10 +383,13 @@ def read_file(data: bytes, mime: str, tag: str, masker: Masker) -> dict:
 
 def _finish(evidence, r: dict, facts: list[dict], engine: str, merchant) -> None:
     threshold = settings.ocr_confidence_threshold
+    rules = rules_facts(r["masked"], evidence.tag, [merchant.business_name, merchant.support_name],
+                        [c for _, c in r["lines"]])
     if not facts:
-        facts = rules_facts(r["masked"], evidence.tag, [merchant.business_name, merchant.support_name],
-                            [c for _, c in r["lines"]])
+        facts = rules
         engine = engine if engine != "rules" and "unavailable" in engine else "rules"
+    else:
+        facts = backstop(normalise_kinds(facts, evidence.tag), rules)
     no_text = r["is_image"] and not r["masked"].strip() and not evidence.sent_to_vision
     for i, f in enumerate(facts):
         if "confidence" not in f or f["confidence"] is None:
@@ -496,3 +500,38 @@ def proof_is_missing(fact: dict) -> bool:
     if not pattern:
         return False
     return bool(pattern.search(fact.get("fact", ""))) or fact.get("polarity") == "supports_buyer"
+
+
+# ---------------------------------------------------------------------------
+# Don't let the model's labels alone decide the checklist
+# ---------------------------------------------------------------------------
+# Kinds the gap checklist and the score depend on.
+CHECKLIST_KINDS = {"tracking_number", "carrier_delivered", "carrier_failed", "signature", "delivery_photo",
+                   "buyer_confirmation", "seller_message", "order"}
+
+
+def normalise_kinds(facts: list[dict], tag: str) -> list[dict]:
+    """A tracking-file fact that clearly reports a 'Delivered' status is carrier_delivered,
+    whatever the model called it (it once labelled 'Delivered, left at front porch' as 'other')."""
+    for f in facts:
+        text = f.get("fact", "")
+        if (tag == "Tracking" and f.get("kind") in ("other", "carrier_in_transit", "delivery_address")
+                and POS_DELIVERY.search(text) and not NEG_DELIVERY.search(text) and not NEGATION_RE.search(text)
+                and not re.search(r"out for delivery|to be delivered|will be delivered|expected", text, re.I)):
+            f["kind"] = "carrier_delivered"
+            f["polarity"] = "supports_merchant"
+            f["note"] = "relabelled: the carrier status says Delivered"
+    return facts
+
+
+def backstop(llm_facts_: list[dict], rules: list[dict]) -> list[dict]:
+    """Add rules-engine facts for checklist kinds the model missed in this file."""
+    have = {f.get("kind") for f in llm_facts_}
+    extra = [dict(f, note="added by the rules engine (the AI missed it)")
+             for f in rules if f["kind"] in CHECKLIST_KINDS and f["kind"] not in have]
+    seen, out = set(), []
+    for f in extra:  # one per kind is enough
+        if f["kind"] not in seen:
+            seen.add(f["kind"])
+            out.append(f)
+    return llm_facts_ + out
