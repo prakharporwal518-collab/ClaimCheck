@@ -8,10 +8,10 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: claimcheck-db
-          property: connectionString
+      # No DATABASE_URL here: Render allows one free Postgres per workspace, so by default the
+      # app keeps its data in SQLite inside the container. The demo data reloads on every
+      # start, so a restart simply resets the demo. To keep data, add DATABASE_URL in the
+      # dashboard (Render Postgres, Supabase or Neon connection string).
       - key: PAYPAL_MODE
         value: mock            # set to "sandbox" once PayPal credentials are added
       - key: PAYPAL_CLIENT_ID
@@ -31,13 +31,8 @@ services:
       - key: RENDER_WORKFLOW_SLUG
         value: claimcheck-workflows
 
-databases:
-  - name: claimcheck-db
-    plan: free
-    databaseName: claimcheck
-    user: claimcheck
-
 # Render Workflows (beta) are created from the dashboard: New > Workflow,
 # same repo, root directory "backend", build "pip install -r requirements.txt",
 # start "python workflows/main.py", slug "claimcheck-workflows", and the same
-# DATABASE_URL + GEMINI_API_KEY env vars. See README "Render Workflows".
+# GEMINI_API_KEY. Workflows need a shared DATABASE_URL (Postgres), because the
+# workers run on separate machines. See README "Render Workflows".
