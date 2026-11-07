@@ -163,8 +163,8 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
           <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => csvInput.current.click()}>Import order CSV</button>
           {d.sample_set && (
             <button className="btn-ghost px-2.5 py-1 text-xs" disabled={busy}
-              onClick={async () => { setBusy(true); try { await api.loadSample(d.id); notify('Sample evidence loaded'); await reload() } catch (e) { notify(e.message, 'error') } finally { setBusy(false) } }}>
-              Load sample evidence
+              onClick={async () => { setBusy(true); try { await api.loadSample(d.id); notify(d.sample_set === 'starter' ? 'Order found in the sample CSV and added as evidence' : 'Sample evidence loaded'); await reload() } catch (e) { notify(e.message, 'error') } finally { setBusy(false) } }}>
+              {d.sample_set === 'starter' ? 'Import sample order CSV' : 'Load sample evidence'}
             </button>
           )}
         </div>
@@ -174,6 +174,15 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
         try { const r = await api.orderCsv(d.id, e.target.files[0]); notify(`Matched order ${r.matched['Order ID'] || ''} in the CSV`, 'success'); reload() } catch (err) { notify(err.message, 'error') }
         e.target.value = ''
       }} />
+      {d.sample_set === 'starter' && d.evidence.length === 0 && (
+        <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">
+          <b>No evidence yet — on purpose.</b> This demo case shows a brand-new dispute.
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            <li>Press <b>Generate AI Defence</b> now: claims come back <b>Unverified</b> and the checklist lists exactly what to upload.</li>
+            <li>Or click <b>Import sample order CSV</b> (top right): ClaimCheck finds this order in a store export and adds its tracking number.</li>
+          </ul>
+        </div>
+      )}
       <div
         onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
         onDragLeave={() => setDrag(false)}
@@ -185,7 +194,12 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
         {busy ? <Spinner className="h-5 w-5 text-brand-600" /> : <div className="text-2xl">⇪</div>}
         <div className="mt-1 text-sm font-semibold text-slate-700">Drop tracking PDFs, invoices, chat screenshots, delivery photos</div>
         <div className="text-xs text-slate-500">PDF, PNG or JPG · max 5 MB each · images are compressed in your browser first</div>
-        {d.sample_set ? (
+        {d.sample_set === 'starter' ? (
+          <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
+            Sample order export:{' '}
+            <a href={`${api.base}/samples/orders_export.csv`} download className="font-medium text-brand-600 hover:underline">orders_export.csv</a>
+          </div>
+        ) : d.sample_set ? (
           <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
             Sample files to drag in:{' '}
             {SAMPLE_FILES[d.sample_set].map((f) => (

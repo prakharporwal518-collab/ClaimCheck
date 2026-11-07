@@ -317,6 +317,15 @@ async def upload_evidence(dispute_id: str, files: list[UploadFile] = File(...), 
 def load_sample_evidence(dispute_id: str):
     with SessionLocal() as s:
         d = _get(s, dispute_id)
+        sample_set = d.sample_set
+    if sample_set == "starter":
+        # The "no evidence yet" case: its sample is the merchant's order export.
+        with SessionLocal() as s:
+            if any(e.filename.startswith("order-") for e in _get(s, dispute_id).evidence):
+                return {"added": []}
+        return _import_order_rows(dispute_id, (SAMPLE_DIR / "orders_export.csv").read_text())
+    with SessionLocal() as s:
+        d = _get(s, dispute_id)
         files = SAMPLE_SETS.get(d.sample_set)
         if not files:
             raise HTTPException(404, "No sample evidence for this dispute")
@@ -396,6 +405,10 @@ CARRIER_LINKS = {
 async def import_order_csv(dispute_id: str, file: UploadFile = File(...)):
     """Order CSV import (Shopify/WooCommerce export): finds this dispute's order row."""
     raw = (await file.read()).decode("utf-8-sig", errors="replace")
+    return _import_order_rows(dispute_id, raw)
+
+
+def _import_order_rows(dispute_id: str, raw: str) -> dict:
     rows = list(csv.DictReader(io.StringIO(raw)))
     with SessionLocal() as s:
         d = _get(s, dispute_id)

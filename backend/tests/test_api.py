@@ -83,3 +83,13 @@ def test_settings_ignore_pasted_whitespace_and_quotes(monkeypatch):
     assert s.paypal_client_id == "AbC123"
     assert s.paypal_client_secret == "EfG456"
     assert s.paypal_mode == "hybrid"
+
+
+def test_starter_case_imports_the_sample_order_csv(client):
+    client.post("/api/demo/reset")
+    d = client.get("/api/disputes/PP-D-48455").json()
+    assert d["sample_set"] == "starter" and d["evidence_count"] == 0
+    r = client.post("/api/disputes/PP-D-48455/evidence/sample").json()
+    assert len(r["added"]) == 1 and r["matched"]["Order ID"] == "INV-10547"
+    assert client.post("/api/disputes/PP-D-48455/evidence/sample").json()["added"] == []  # not twice
+    client.post("/api/demo/reset")

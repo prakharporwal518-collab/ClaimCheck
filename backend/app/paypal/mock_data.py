@@ -158,6 +158,7 @@ def build_fixtures() -> list[dict]:
                 "postal_code": "07102",
                 "country_code": "US",
             },
+            sample_set="starter",  # no evidence yet, on purpose; its sample is the order CSV
         ),
         # --- Resolved history (powers the analytics page) ----------------------
         *[
