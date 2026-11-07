@@ -10,3 +10,5 @@ backend/data/
 .pytest_cache/
 .DS_Store
 backend/static/
+backend/data-*/
+data-*/
