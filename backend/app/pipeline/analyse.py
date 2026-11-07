@@ -396,7 +396,28 @@ def template_report(ctx: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def run_analysis(dispute_id: str, *, extract_parallel: bool = True) -> dict:
+def claim_run(dispute_id: str, engine: str) -> bool:
+    """Atomically take a queued analysis for `engine`, so a Render Workflow run and the
+    in-process fallback can never both run it. A Workflow retry may also re-take its own
+    failed run."""
+    from sqlalchemy import and_, or_, update
+
+    with SessionLocal() as s:
+        res = s.execute(
+            update(Dispute)
+            .where(
+                Dispute.id == dispute_id,
+                Dispute.analysis_engine == engine,
+                or_(Dispute.analysis_state == "queued",
+                    and_(Dispute.analysis_state == "error", Dispute.analysis_engine == "render-workflows")),
+            )
+            .values(analysis_state="running", analysis_error="")
+        )
+        s.commit()
+        return res.rowcount == 1
+
+
+def run_analysis(dispute_id: str, *, extract_parallel: bool = True, claimed: bool = False) -> dict:
     t0 = time.time()
     steps: list[dict] = []
 
@@ -407,9 +428,10 @@ def run_analysis(dispute_id: str, *, extract_parallel: bool = True) -> dict:
         d = s.get(Dispute, dispute_id)
         if not d:
             raise ValueError(f"Unknown dispute {dispute_id}")
-        d.analysis_state = "running"
-        d.analysis_error = ""
-        s.commit()
+        if not claimed:
+            d.analysis_state = "running"
+            d.analysis_error = ""
+            s.commit()
 
     try:
         # 1. Extract any files not processed yet (parallel).
