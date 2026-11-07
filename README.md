@@ -97,7 +97,7 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 - Licence: Master-detail, rich select and AG Studio are Enterprise features and show a trial watermark until `VITE_AG_GRID_LICENSE_KEY` is set.
 
 ### Render + Render Workflows
-- `render.yaml` Blueprint: one Docker web service (the API serves the built React app on the same URL) plus Render Postgres. The Dockerfile installs Tesseract.
+- `render.yaml` Blueprint: one Docker web service (the API serves the built React app on the same URL). The Dockerfile installs Tesseract. By default the live demo stores data in SQLite inside the container and reloads the demo disputes on each start; set `DATABASE_URL` (Render Postgres, Supabase or Neon) to keep data. Render allows one free Postgres per workspace.
 - `backend/workflows/main.py`: `analyse_dispute` fans out `extract_evidence` for each file in parallel with `asyncio.gather(ctx.run(...))`, then runs the pipeline. Default retries (3, 2 s, ×2 backoff) mean a Gemini rate limit retries the task instead of failing the demo.
 - `backend/app/runner.py` starts the task with the Render SDK (`RenderAsync().workflows.start_task("claimcheck-workflows/analyse_dispute", [id])`); the frontend polls the dispute. If Workflows is off or fails, the in-process pipeline runs instead.
 - **Set up the Workflow**: in the Render dashboard, New → Workflow, same repo, root directory `backend`, build `pip install -r requirements.txt`, start `python workflows/main.py`, slug `claimcheck-workflows`, with the same `DATABASE_URL` and `GEMINI_API_KEY`. Then set `USE_RENDER_WORKFLOWS=true` and `RENDER_API_KEY` on the web service. The Workflow runtime has no Tesseract, so images there go straight to Gemini vision.

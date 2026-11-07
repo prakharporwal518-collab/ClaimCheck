@@ -19,7 +19,7 @@ class Settings:
     # --- Database ---------------------------------------------------------
     # SQLite locally; set DATABASE_URL to Render Postgres (or Supabase) in production.
     database_url: str = field(
-        default_factory=lambda: os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'claimcheck.db'}")
+        default_factory=lambda: os.getenv("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'claimcheck.db'}"
     )
 
     # --- PayPal -----------------------------------------------------------
