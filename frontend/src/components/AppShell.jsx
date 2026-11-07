@@ -62,7 +62,11 @@ export default function AppShell() {
               {health?.offline && <span className="chip bg-rose-100 text-rose-700">API offline</span>}
               {health && !health.offline && (
                 <>
-                  <Badge ok={health.paypal_mode === 'sandbox'} on="PayPal Sandbox" off="PayPal: seeded demo" />
+                  <Badge
+                    ok={health.paypal_sources?.includes('sandbox')}
+                    on={health.paypal_sources?.includes('mock') ? 'PayPal Sandbox + demo data' : 'PayPal Sandbox'}
+                    off="PayPal: seeded demo"
+                  />
                   <Badge ok={health.gemini} on={health.gemini_model} off="AI: rules engine" />
                   <Badge ok={health.render_workflows} on="Render Workflows" off="In-process jobs" />
                 </>

@@ -48,6 +48,8 @@ export default function Inbox() {
   const [rows, setRows] = useState(null)
   const [quick, setQuick] = useState('')
   const [view, setView] = useState('open')
+  const [source, setSource] = useState('all')
+  const both = health?.paypal_sources?.length > 1
   const [busy, setBusy] = useState('')
 
   const load = useCallback(() => api.disputes().then(setRows).catch((e) => notify(e.message, 'error')), [notify])
@@ -61,10 +63,12 @@ export default function Inbox() {
 
   const shown = useMemo(() => {
     if (!rows) return null
-    if (view === 'open') return rows.filter(isOpen)
-    if (view === 'closed') return rows.filter((r) => !isOpen(r))
-    return rows
-  }, [rows, view])
+    let list = rows
+    if (source !== 'all') list = list.filter((r) => (source === 'sandbox' ? r.source === 'sandbox' : r.source !== 'sandbox'))
+    if (view === 'open') return list.filter(isOpen)
+    if (view === 'closed') return list.filter((r) => !isOpen(r))
+    return list
+  }, [rows, view, source])
 
   const kpis = useMemo(() => {
     const open = (rows || []).filter(isOpen)
@@ -81,6 +85,13 @@ export default function Inbox() {
     () => [
       { field: 'id', headerName: 'Dispute', width: 130, cellClass: 'font-mono text-xs', pinned: 'left' },
       { field: 'buyer', headerName: 'Buyer', flex: 1, minWidth: 140 },
+      {
+        field: 'source', headerName: 'Source', width: 135, filter: 'agSetColumnFilter',
+        valueFormatter: (p) => (p.value === 'sandbox' ? 'PayPal Sandbox' : 'Demo data'),
+        cellRenderer: (p) => p.value === 'sandbox'
+          ? <span className="chip bg-blue-50 text-blue-800 ring-1 ring-blue-200">PayPal Sandbox</span>
+          : <span className="chip bg-slate-100 text-slate-600">Demo data</span>,
+      },
       { field: 'item', headerName: 'Item', flex: 1.4, minWidth: 200 },
       {
         field: 'amount', headerName: 'Amount', width: 110, type: 'rightAligned',
@@ -128,10 +139,13 @@ export default function Inbox() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-ghost" disabled={!!busy}
-            onClick={() => run('sync', api.sync, (r) => `Synced ${r.listed} disputes from PayPal ${r.mode === 'mock' ? '(seeded)' : 'Sandbox'}: ${r.new} new`)}>
+            onClick={() => run('sync', api.sync, (r) => {
+              const parts = Object.entries(r.sources || {}).map(([k, v]) => `${k === 'sandbox' ? 'PayPal Sandbox' : 'demo data'}: ${v.error ? 'error – ' + v.error : `${v.listed} listed, ${v.new} new`}`)
+              return `Synced. ${parts.join(' · ')}`
+            })}>
             {busy === 'sync' ? <Spinner /> : '↻'} Sync from PayPal
           </button>
-          {health?.paypal_mode !== 'sandbox' && (
+          {health?.paypal_sources?.includes('mock') && (
             <button className="btn-primary" disabled={!!busy}
               onClick={() => run('sim', api.simulate, (r) => `Webhook CUSTOMER.DISPUTE.CREATED → ${r.dispute_id} synced, drafting a defence…`)}>
               {busy === 'sim' ? <Spinner /> : '⚡'} Simulate new dispute (webhook)
@@ -162,6 +176,16 @@ export default function Inbox() {
               {l}
             </button>
           ))}
+          {both && (
+            <div className="ml-2 flex rounded-lg border border-slate-200 p-0.5 text-sm">
+              {[['all', 'All sources'], ['mock', 'Demo data'], ['sandbox', 'PayPal Sandbox']].map(([v, l]) => (
+                <button key={v} onClick={() => setSource(v)}
+                  className={`rounded-md px-2.5 py-1 font-medium ${source === v ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
           <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Search buyer, item, dispute ID…"
             className="ml-auto w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm sm:w-72" />
         </div>

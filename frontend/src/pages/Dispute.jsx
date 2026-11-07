@@ -185,11 +185,23 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
         {busy ? <Spinner className="h-5 w-5 text-brand-600" /> : <div className="text-2xl">⇪</div>}
         <div className="mt-1 text-sm font-semibold text-slate-700">Drop tracking PDFs, invoices, chat screenshots, delivery photos</div>
         <div className="text-xs text-slate-500">PDF, PNG or JPG · max 5 MB each · images are compressed in your browser first</div>
-        {d.sample_set && (
+        {d.sample_set ? (
           <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
             Sample files to drag in:{' '}
             {SAMPLE_FILES[d.sample_set].map((f) => (
               <a key={f} href={`${api.base}/samples/${d.sample_set}/${f}`} download className="mx-1 font-medium text-brand-600 hover:underline">{f}</a>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
+            Sample files to download and drag in:{' '}
+            {[['strong', 'delivered set'], ['buyer_right', 'returned-to-sender set']].map(([set, label]) => (
+              <span key={set} className="mx-1">
+                <b className="font-semibold text-slate-600">{label}:</b>{' '}
+                {SAMPLE_FILES[set].map((f) => (
+                  <a key={f} href={`${api.base}/samples/${set}/${f}`} download className="mr-1 font-medium text-brand-600 hover:underline">{f}</a>
+                ))}
+              </span>
             ))}
           </div>
         )}
@@ -262,7 +274,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
 // ---------------------------------------------------------------------------
 export default function Dispute() {
   const { id } = useParams()
-  const { notify } = useApp()
+  const { notify, health } = useApp()
   const [d, setD] = useState(null)
   const [selectedClaim, setSelectedClaim] = useState(null)
   const [report, setReport] = useState('')
@@ -346,6 +358,13 @@ export default function Dispute() {
     }
   }
 
+  // Real PayPal Sandbox actions can't be undone; the server may also ask for a key.
+  const sandboxKey = () => {
+    if (d.source !== 'sandbox') return ''
+    if (!confirm('This is a real PayPal Sandbox dispute. Sending this calls PayPal and cannot be undone. Continue?')) return null
+    return health?.sandbox_actions_locked ? (prompt('Enter the Sandbox action key') ?? null) : ''
+  }
+
   const act = async (name, fn, okMsg) => {
     setBusy(name)
     try {
@@ -382,6 +401,13 @@ export default function Dispute() {
           </button>
         </div>
       </div>
+
+      {d.source === 'sandbox' && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
+          <b>Real PayPal Sandbox dispute.</b> It was read from the PayPal Disputes API. <b>Submit</b> and <b>Refund</b> call
+          PayPal for real and can't be undone. The demo disputes are safe to play with.
+        </div>
+      )}
 
       {pendingConfirm && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
@@ -545,12 +571,12 @@ export default function Dispute() {
                 </label>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn-primary" disabled={!approved || !!busy || report.length > 2000}
-                    onClick={() => act('submit', () => api.submit(d.id, report), (r) => `Evidence submitted via provide-evidence (${r.mode === 'mock' ? 'seeded mock' : 'PayPal Sandbox'})`)}>
+                    onClick={() => { const k = sandboxKey(); if (k !== null) act('submit', () => api.submit(d.id, report, k), (r) => `Evidence submitted via provide-evidence (${r.mode === 'mock' ? 'seeded mock' : 'PayPal Sandbox'})`) }}>
                     {busy === 'submit' ? <Spinner /> : '➤'} Submit to PayPal
                   </button>
                   <a className="btn-ghost" href={api.pdfUrl(d.id)}>⇩ Export PDF</a>
                   <button className={rec?.action === 'refund' ? 'btn-danger' : 'btn-ghost'} disabled={!!busy}
-                    onClick={() => { if (confirm('Accept the claim and refund the buyer through PayPal?')) act('refund', () => api.acceptClaim(d.id, ''), (r) => `Claim accepted, buyer refunded (accept-claim, ${r.mode})`) }}>
+                    onClick={() => { if (!confirm('Accept the claim and refund the buyer through PayPal?')) return; const k = sandboxKey(); if (k !== null) act('refund', () => api.acceptClaim(d.id, '', k), (r) => `Claim accepted, buyer refunded (accept-claim, ${r.mode})`) }}>
                     {busy === 'refund' ? <Spinner /> : '↺'} {rec?.action === 'refund' ? 'Refund buyer (recommended)' : 'Accept claim & refund'}
                   </button>
                 </div>

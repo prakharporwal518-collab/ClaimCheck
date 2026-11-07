@@ -49,7 +49,12 @@ export default function Settings() {
           {health && !health.offline && (
             <dl className="mt-3 grid grid-cols-[160px_1fr] gap-y-2 text-sm">
               <dt className="text-slate-500">PayPal</dt>
-              <dd>{health.paypal_mode === 'sandbox' ? 'PayPal Sandbox (live API calls)' : 'Seeded mock in the PayPal API JSON shape'} · <code className="text-xs">{health.paypal_disputes_path}</code></dd>
+              <dd>
+                {health.paypal_sources?.includes('sandbox') && health.paypal_sources?.includes('mock')
+                  ? 'PayPal Sandbox (live API calls) + seeded demo data'
+                  : health.paypal_sources?.includes('sandbox') ? 'PayPal Sandbox (live API calls)' : 'Seeded mock in the PayPal API JSON shape'}
+                {' · '}<code className="text-xs">{health.paypal_disputes_path}</code>
+              </dd>
               <dt className="text-slate-500">AI model</dt>
               <dd>{health.gemini ? health.gemini_model : 'Rules engine (set GEMINI_API_KEY to use Gemini)'}</dd>
               <dt className="text-slate-500">Jobs</dt>
@@ -63,10 +68,10 @@ export default function Settings() {
             </dl>
           )}
         </div>
-        {health?.paypal_mode !== 'sandbox' && (
+        {health?.paypal_sources?.includes('mock') && (
           <div className="card p-5">
             <h2 className="text-lg font-bold">Demo data</h2>
-            <p className="mt-1 text-sm text-slate-500">Reset every dispute, file and analysis back to the seeded demo state.</p>
+            <p className="mt-1 text-sm text-slate-500">Reset every demo dispute, file and analysis back to the seeded state.{health?.paypal_sources?.includes('sandbox') && ' PayPal Sandbox disputes are kept.'}</p>
             <button className="btn-ghost mt-3" disabled={busy} onClick={async () => {
               if (!confirm('Reset all demo data?')) return
               setBusy(true)

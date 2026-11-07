@@ -46,7 +46,8 @@ cd backend && python -m pytest -q
 
 | Variable | Default | What it does |
 |---|---|---|
-| `PAYPAL_MODE` | `mock` | `mock` = seeded disputes in the PayPal JSON shape; `sandbox` = real PayPal Sandbox |
+| `PAYPAL_MODE` | `mock` | `mock` = seeded disputes in the PayPal JSON shape; `sandbox` = real PayPal Sandbox; `hybrid` = both in one inbox, each labelled (the live site uses this) |
+| `SANDBOX_ACTIONS_KEY` | – | Optional: asked before Submit/Refund on real Sandbox disputes, so visitors can't use them up |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | – | Sandbox REST app credentials |
 | `PAYPAL_DISPUTES_PATH` | `/v1/customer/disputes` | Base path, kept as one setting so a v2 switch is a one-line change |
 | `PAYPAL_WEBHOOK_ID` | – | Turns on webhook signature verification |
@@ -86,6 +87,7 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 
 ### PayPal Disputes API + AI
 - `backend/app/paypal/client.py`: one `PayPalClient` interface with `SandboxClient` (OAuth token, list and get disputes, multipart `provide-evidence`, `accept-claim`, webhook signature verification) and `MockClient` (seeded data in the same JSON shape). The parser is tested against both.
+- **One site, two sources** (`PAYPAL_MODE=hybrid`): the seeded demo stories and real PayPal Sandbox disputes share one inbox, each labelled. Every action goes to the dispute's own source, "Reset demo" keeps Sandbox disputes, and Sandbox actions ask for confirmation (and `SANDBOX_ACTIONS_KEY` if set).
 - **Agent behaviour**: on `CUSTOMER.DISPUTE.CREATED`, ClaimCheck syncs the dispute and drafts a defence with no clicks. In mock mode, **Simulate new dispute (webhook)** in the inbox fires the same handler.
 - `backend/scripts/sandbox_seed.py` creates real Sandbox orders with Orders v2 so disputes can be opened on real transactions.
 

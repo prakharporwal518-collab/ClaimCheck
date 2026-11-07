@@ -14,6 +14,9 @@ async function request(path, options = {}) {
   return type.includes('application/json') ? res.json() : res
 }
 
+// Real PayPal Sandbox actions can be locked with a key (SANDBOX_ACTIONS_KEY on the server).
+const withKey = (opts, key) => (key ? { ...opts, headers: { ...opts.headers, 'X-Sandbox-Key': key } } : opts)
+
 const json = (method, body) => ({
   method,
   headers: { 'Content-Type': 'application/json' },
@@ -42,8 +45,8 @@ export const api = {
   fileUrl: (eid) => `${BASE}/api/evidence/${eid}/file`,
   analyse: (id) => request(`/api/disputes/${id}/analyse`, { method: 'POST' }),
   saveReport: (id, text) => request(`/api/disputes/${id}/report`, json('PUT', { text })),
-  submit: (id, text) => request(`/api/disputes/${id}/submit`, json('POST', { approved: true, text })),
-  acceptClaim: (id, note) => request(`/api/disputes/${id}/accept-claim`, json('POST', { note })),
+  submit: (id, text, key) => request(`/api/disputes/${id}/submit`, withKey(json('POST', { approved: true, text }), key)),
+  acceptClaim: (id, note, key) => request(`/api/disputes/${id}/accept-claim`, withKey(json('POST', { note }), key)),
   pdfUrl: (id) => `${BASE}/api/disputes/${id}/report.pdf`,
   simulate: () => request('/api/demo/simulate-dispute', { method: 'POST' }),
   reset: () => request('/api/demo/reset', { method: 'POST' }),

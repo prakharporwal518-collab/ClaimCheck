@@ -13,7 +13,11 @@ services:
       # start, so a restart simply resets the demo. To keep data, add DATABASE_URL in the
       # dashboard (Render Postgres, Supabase or Neon connection string).
       - key: PAYPAL_MODE
-        value: mock            # set to "sandbox" once PayPal credentials are added
+        # hybrid = seeded demo disputes + your real PayPal Sandbox disputes in one inbox.
+        # Without PAYPAL_CLIENT_ID/SECRET it simply shows the demo data.
+        value: hybrid
+      - key: SANDBOX_ACTIONS_KEY  # optional: asked before Submit/Refund on real Sandbox disputes
+        sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET

@@ -65,7 +65,7 @@ export default function Analytics() {
     () =>
       rows && {
         description:
-          'PayPal disputes handled by ClaimCheck for one small merchant. strength is the evidence-strength label (High/Medium/Low), score is 0-10, money_at_risk is the amount of disputes that are not resolved yet, days_left is days until the PayPal response deadline (open disputes only).',
+          'PayPal disputes handled by ClaimCheck for one small merchant. source is Demo data (seeded) or PayPal Sandbox (real API). strength is the evidence-strength label (High/Medium/Low), score is 0-10, money_at_risk is the amount of disputes that are not resolved yet, days_left is days until the PayPal response deadline (open disputes only).',
         sources: [{ id: 'disputes', name: 'Disputes', data: rows }],
       },
     [rows],

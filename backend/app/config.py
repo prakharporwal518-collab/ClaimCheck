@@ -57,6 +57,10 @@ class Settings:
         default_factory=lambda: os.getenv("RENDER_WORKFLOW_SLUG", "claimcheck-workflows")
     )
 
+    # Optional: when set, submitting or refunding a *PayPal Sandbox* dispute asks for this key,
+    # so visitors of a public demo cannot use up the real Sandbox disputes.
+    sandbox_actions_key: str = field(default_factory=lambda: os.getenv("SANDBOX_ACTIONS_KEY", ""))
+
     # --- Web ------------------------------------------------------------------
     cors_origins: list[str] = field(
         default_factory=lambda: [
