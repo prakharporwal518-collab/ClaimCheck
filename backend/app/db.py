@@ -62,7 +62,7 @@ class Dispute(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # ClaimCheck workflow state
     analysis_state: Mapped[str] = mapped_column(String(16), default="idle")  # idle|queued|running|done|error
-    analysis_engine: Mapped[str] = mapped_column(String(32), default="")  # in-process | render-workflows
+    analysis_engine: Mapped[str] = mapped_column(Text, default="")  # in-process | render-workflows
     analysis_run_id: Mapped[str] = mapped_column(Text, default="")
     analysis_error: Mapped[str] = mapped_column(Text, default="")
     decision: Mapped[str] = mapped_column(String(16), default="open")  # open|submitted|refunded

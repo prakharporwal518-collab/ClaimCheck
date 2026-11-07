@@ -54,8 +54,9 @@ cd backend && python -m pytest -q
 | `GEMINI_API_KEY` | – | Uses Gemini instead of the rules engine |
 | `OCR_LANGS` | `eng+hin` | Tesseract languages (missing packs are skipped) |
 | `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | `gemini-3.6-flash` / `gemini-3.5-flash-lite` | Primary and fallback models |
-| `USE_RENDER_WORKFLOWS` + `RENDER_API_KEY` | off | Runs the analysis as a Render Workflow |
-| `DATABASE_URL` | SQLite in `backend/data/` | Render Postgres or Supabase in production |
+| `USE_RENDER_WORKFLOWS` + `RENDER_API_KEY` | off | Runs the analysis as a Render Workflow (needs a shared `DATABASE_URL`) |
+| `WORKFLOW_START_TIMEOUT` | `90` | Seconds before the web service takes over a Workflow run that hasn't started |
+| `DATABASE_URL` | SQLite in `backend/data/` | Postgres in production (the live site uses Neon) |
 | `VITE_AG_GRID_LICENSE_KEY` (frontend build) | – | Removes the AG Grid / AG Studio trial watermark |
 
 ## How it works
@@ -101,8 +102,10 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 ### Render + Render Workflows
 - `render.yaml` Blueprint: one Docker web service (the API serves the built React app on the same URL). The Dockerfile installs Tesseract. By default the live demo stores data in SQLite inside the container and reloads the demo disputes on each start; set `DATABASE_URL` (Render Postgres, Supabase or Neon) to keep data. Render allows one free Postgres per workspace.
 - `backend/workflows/main.py`: `analyse_dispute` fans out `extract_evidence` for each file in parallel with `asyncio.gather(ctx.run(...))`, then runs the pipeline. Default retries (3, 2 s, ×2 backoff) mean a Gemini rate limit retries the task instead of failing the demo.
-- `backend/app/runner.py` starts the task with the Render SDK (`RenderAsync().workflows.start_task("claimcheck-workflows/analyse_dispute", [id])`); the frontend polls the dispute. If Workflows is off or fails, the in-process pipeline runs instead.
-- **Set up the Workflow**: in the Render dashboard, New → Workflow, same repo, root directory `backend`, build `pip install -r requirements.txt`, start `python workflows/main.py`, slug `claimcheck-workflows`, with the same `DATABASE_URL` and `GEMINI_API_KEY`. Then set `USE_RENDER_WORKFLOWS=true` and `RENDER_API_KEY` on the web service. The Workflow runtime has no Tesseract, so images there go straight to Gemini vision.
+- `backend/app/runner.py` starts the task with the Render SDK (`RenderAsync().workflows.start_task("claimcheck-workflows/analyse_dispute", [id])`); the frontend polls the dispute.
+- **Safety net, so the demo never gets stuck:** if the Workflow run can't be started, the web service runs the analysis itself at once; if it was started but no worker picks it up within `WORKFLOW_START_TIMEOUT` (90 s), the web service takes over. An atomic claim in the database makes sure only one of them ever runs an analysis, so a late worker never runs it twice. The dispute page shows which engine ran it.
+- **Shared database: Neon Postgres.** Workers run on separate machines, so the web service and the Workflow share one `DATABASE_URL` (a free Neon project, because Render allows one free Postgres per workspace). This also keeps data across restarts.
+- **Set up the Workflow**: in the Render dashboard, New → Workflow, same repo, root directory `backend`, build `pip install -r requirements.txt`, start `python workflows/main.py`, name `claimcheck-workflows`, with the same `DATABASE_URL` and `GEMINI_API_KEY`. Then set `DATABASE_URL` and `RENDER_API_KEY` on the web service (`USE_RENDER_WORKFLOWS=true` is already in `render.yaml`). The Workflow runtime has no Tesseract, so images there go straight to Gemini vision.
 
 ### APIMatic ContextMatic
 ContextMatic gives a coding agent exact PayPal API methods, types and auth patterns. **To do before submitting:** install it in your editor, run `/onboard-context-matic`, check its catalog for the Disputes API, and use it to review or regenerate `backend/app/paypal/client.py` and `backend/scripts/sandbox_seed.py`. Then fill in this section with what it changed, for example the multipart field names for `provide-evidence` and the `accept-claim` body, and keep a short screen recording for Devpost. (The current client was written without ContextMatic, so don't claim it until you have used it.)

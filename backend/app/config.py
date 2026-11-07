@@ -53,6 +53,9 @@ class Settings:
     # in-process (the fallback the plan asks for because Workflows is beta).
     use_render_workflows: bool = field(default_factory=lambda: _bool("USE_RENDER_WORKFLOWS", False))
     render_api_key: str = field(default_factory=lambda: os.getenv("RENDER_API_KEY", ""))
+    # Safety net: if no Workflow worker picks a run up within this many seconds,
+    # the web service runs the analysis itself.
+    workflow_start_timeout: int = field(default_factory=lambda: int(os.getenv("WORKFLOW_START_TIMEOUT", "90")))
     render_workflow_slug: str = field(
         default_factory=lambda: os.getenv("RENDER_WORKFLOW_SLUG", "claimcheck-workflows")
     )

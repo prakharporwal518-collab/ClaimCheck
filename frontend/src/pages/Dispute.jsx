@@ -435,7 +435,7 @@ export default function Dispute() {
           </div>
           {a && !working && (
             <div className="mt-2 text-xs text-slate-500">
-              Engine: <b>{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b>Render Workflow</b> ({d.analysis_run_id})</> : 'in-process'} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
+              Engine: <b>{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b>Render Workflow</b> ({d.analysis_run_id})</> : (d.analysis_engine || 'in-process')} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
               {elapsed != null && <> · <b className="text-emerald-700">defence drafted in {elapsed.toFixed(1)} s</b> (vs ~20 min by hand)</>}
             </div>
           )}

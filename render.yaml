@@ -8,10 +8,11 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
-      # No DATABASE_URL here: Render allows one free Postgres per workspace, so by default the
-      # app keeps its data in SQLite inside the container. The demo data reloads on every
-      # start, so a restart simply resets the demo. To keep data, add DATABASE_URL in the
-      # dashboard (Render Postgres, Supabase or Neon connection string).
+      # Shared Postgres (we use Neon; Render allows one free Postgres per workspace).
+      # Needed for Render Workflows, because the workers run on separate machines.
+      # Without it the app falls back to SQLite inside the container (reset on restart).
+      - key: DATABASE_URL
+        sync: false
       - key: PAYPAL_MODE
         # hybrid = seeded demo disputes + your real PayPal Sandbox disputes in one inbox.
         # Without PAYPAL_CLIENT_ID/SECRET it simply shows the demo data.
@@ -29,7 +30,9 @@ services:
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
       - key: USE_RENDER_WORKFLOWS
-        value: "false"         # set "true" after creating the Workflow service below
+        value: "true"          # only takes effect once RENDER_API_KEY is set
+      - key: WORKFLOW_START_TIMEOUT
+        value: "90"            # safety net: run in-process if no Workflow worker starts in time
       - key: RENDER_API_KEY
         sync: false
       - key: RENDER_WORKFLOW_SLUG
@@ -37,6 +40,5 @@ services:
 
 # Render Workflows (beta) are created from the dashboard: New > Workflow,
 # same repo, root directory "backend", build "pip install -r requirements.txt",
-# start "python workflows/main.py", slug "claimcheck-workflows", and the same
-# GEMINI_API_KEY. Workflows need a shared DATABASE_URL (Postgres), because the
-# workers run on separate machines. See README "Render Workflows".
+# start "python workflows/main.py", name "claimcheck-workflows", and the same
+# DATABASE_URL and GEMINI_API_KEY as the web service. See README "Render Workflows".

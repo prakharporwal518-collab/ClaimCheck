@@ -64,6 +64,14 @@ SAMPLE_SETS = {
 def _startup() -> None:
     init_db()
     with SessionLocal() as s:
+        # An in-process run can't survive a restart: don't leave it "Drafting..." forever.
+        # (Render Workflow runs live on their own machines and are left alone.)
+        for d in s.query(Dispute).filter(Dispute.analysis_state.in_(["queued", "running"]),
+                                         Dispute.analysis_engine != "render-workflows"):
+            d.analysis_state = "error"
+            d.analysis_error = "Interrupted by a server restart. Press Re-run AI Defence."
+        s.commit()
+    with SessionLocal() as s:
         if s.query(Dispute).count() == 0:
             # Wrong PayPal keys must not stop the app from starting: errors are per source.
             for src, r in sync.sync_sources(s, enabled_sources()).items():
