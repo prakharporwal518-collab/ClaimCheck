@@ -1,6 +1,6 @@
 // Watermelon-style file upload: keyboard-accessible drop zone with drag state and a busy state.
-import { useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
+import { gsap, useMotionGSAP } from '@/lib/gsap'
 import { FileUp, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -8,14 +8,23 @@ export function FileUpload({ onFiles, busy, accept, multiple = true, title, hint
   const input = useRef(null)
   const [drag, setDrag] = useState(false)
   const open = () => !busy && input.current?.click()
+  // The drop zone swells slightly while a file is dragged over it.
+  const zone = useRef(null)
+  const scaleTo = useRef(null)
+  useMotionGSAP(() => {
+    scaleTo.current = gsap.quickTo(zone.current, 'scale', { duration: 0.25, ease: 'power2.out' })
+    return () => { scaleTo.current = null }
+  }, { scope: zone })
+  useEffect(() => { scaleTo.current?.(drag ? 1.015 : 1) }, [drag])
+
   return (
-    <motion.div
+    <div
+      ref={zone}
       aria-busy={busy}
       onClick={open}
       onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (!busy) onFiles(e.dataTransfer.files) }}
-      animate={{ scale: drag ? 1.01 : 1 }}
       className={cn(
         'group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors',
         drag ? 'border-primary bg-accent' : 'border-input hover:border-primary hover:bg-muted/60',
@@ -37,6 +46,6 @@ export function FileUpload({ onFiles, busy, accept, multiple = true, title, hint
       </button>
       {hint && <div className="relative mt-1 text-xs text-muted-foreground">{hint}</div>}
       {children && <div className="relative mt-3 text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>{children}</div>}
-    </motion.div>
+    </div>
   )
 }
