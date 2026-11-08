@@ -1,12 +1,13 @@
 // Defence-report view: strength gauge + breakdown, recommendation, gap checklist and the report editor.
-import { useState } from 'react'
-import { motion } from 'motion/react'
+import { useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, ChevronDown, Circle, FileDown, Gauge, ListChecks, RotateCcw, Send, ShieldCheck, XCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox, Textarea } from '@/components/ui/input'
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number'
+import { Appear } from '@/components/motion-primitives/in-view'
+import { gsap, useMotionGSAP } from '@/lib/gsap'
 import { Spinner } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -16,13 +17,17 @@ const STROKE = { High: 'var(--success)', Medium: 'var(--warning)', Low: 'var(--d
 function ScoreGauge({ score, label }) {
   const r = 52
   const c = Math.PI * r
+  const arc = useRef(null)
+  // Draw the arc from empty to the score; the markup already holds the final offset.
+  useMotionGSAP(() => {
+    gsap.fromTo(arc.current, { strokeDashoffset: c }, { strokeDashoffset: c * (1 - score / 10), duration: 1.1, ease: 'power3.out' })
+  }, { scope: arc, dependencies: [score] })
   return (
     <div className="relative mx-auto h-[86px] w-[140px] shrink-0" role="img" aria-label={`Evidence strength ${label}, ${score} out of 10`}>
       <svg viewBox="0 0 128 72" className="h-full w-full" aria-hidden="true">
         <path d="M12 64a52 52 0 0 1 104 0" fill="none" stroke="var(--muted)" strokeWidth="10" strokeLinecap="round" />
-        <motion.path d="M12 64a52 52 0 0 1 104 0" fill="none" stroke={STROKE[label]} strokeWidth="10" strokeLinecap="round"
-          strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - score / 10) }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />
+        <path ref={arc} d="M12 64a52 52 0 0 1 104 0" fill="none" stroke={STROKE[label]} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - score / 10)} />
       </svg>
       <div className="absolute inset-x-0 bottom-0 text-center">
         <div className="text-[28px] font-bold leading-none tracking-tight">
@@ -49,8 +54,8 @@ export function StrengthCard({ analysis: a }) {
           {open ? 'Hide' : 'Show'} how the score was earned
         </button>
         {open && (
-          <motion.table initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="w-full text-sm">
-            <tbody>
+          <table className="w-full text-sm">
+            <Appear as="tbody" targets="tr" stagger={0.04} from={{ autoAlpha: 0, x: -8 }} duration={0.3}>
               {a.score_breakdown.map((b, i) => (
                 <tr key={i} className="border-t">
                   <td className={cn('w-12 py-1.5 font-mono font-semibold tabular', b.points > 0 ? 'text-success-fg' : b.points < 0 ? 'text-danger-fg' : '')}>
@@ -60,8 +65,8 @@ export function StrengthCard({ analysis: a }) {
                 </tr>
               ))}
               <tr className="border-t font-semibold"><td className="py-1.5 font-mono tabular">{a.strength_score}</td><td>Final score (0–10). High 7–10, Medium 4–6, Low 0–3.</td></tr>
-            </tbody>
-          </motion.table>
+            </Appear>
+          </table>
         )}
         {rec && (
           <div className={cn('rounded-xl border px-4 py-3', rec.action === 'refund' ? 'border-danger-border bg-danger-bg' : 'border-success-border bg-success-bg')}>

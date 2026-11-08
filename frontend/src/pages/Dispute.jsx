@@ -11,7 +11,6 @@ import {
   AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronRight, ExternalLink, FileSpreadsheet, FileText, FlaskConical,
   History, Info, MessageSquareQuote, PackageOpen, ScrollText, ShieldCheck, Sparkles, Trash2,
 } from 'lucide-react'
-import { motion } from 'motion/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,7 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { FileUpload } from '@/components/blocks/file-upload'
 import { AnalysisLoader } from '@/components/blocks/analysis-loader'
 import { GapsCard, ReportEditor, StrengthCard } from '@/components/blocks/report-view'
-import { InView } from '@/components/motion-primitives/in-view'
+import { Appear, InView } from '@/components/motion-primitives/in-view'
 import { cn } from '@/lib/utils'
 
 const TAGS = ['Invoice', 'Tracking', 'Chat', 'Delivery photo', 'Order', 'Other']
@@ -282,7 +281,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
             />
           </div>
           {sel && (
-            <motion.div key={sel.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-xl border bg-muted/40 p-4">
+            <Appear watch={sel.id} className="mt-4 rounded-xl border bg-muted/40 p-4">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" />
                 <span className="font-semibold text-foreground">{sel.filename}</span>
@@ -313,7 +312,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
                 {sel.facts.length === 0 && sel.state === 'done' && <li className="text-sm text-muted-foreground">No facts found in this file.</li>}
               </ul>
               <p className="mt-2 flex items-center gap-1.5 text-[11px] text-subtle"><ShieldCheck className="size-3.5" aria-hidden="true" />Buyer details are masked ([BUYER], [ADDRESS]…) before anything is sent to the AI model.</p>
-            </motion.div>
+            </Appear>
           )}
         </>
       )}
@@ -540,9 +539,10 @@ export default function Dispute() {
               <div className="mt-2 text-xs text-muted-foreground">— {d.buyer}, via PayPal</div>
             </blockquote>
             {full ? (
-              <ol className="mt-4 space-y-2">
+              <Appear as="ol" className="mt-4 space-y-2" stagger={0.08} from={{ autoAlpha: 0, x: -8 }} duration={0.45}
+                watch={a.results.map((r) => r.claim_id + r.status).join()}>
                 {a.results.map((r, i) => (
-                  <motion.li key={r.claim_id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
+                  <li key={r.claim_id}>
                     <button onClick={() => setSelectedClaim(r.claim_id === selectedClaim ? null : r.claim_id)}
                       aria-pressed={selectedClaim === r.claim_id}
                       className={cn('flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
@@ -551,9 +551,9 @@ export default function Dispute() {
                       <span className="flex-1 text-sm font-medium">{r.claim_text}</span>
                       <StatusFlag status={r.status} pop={justDone} />
                     </button>
-                  </motion.li>
+                  </li>
                 ))}
-              </ol>
+              </Appear>
             ) : open ? (
               <p className="mt-4 text-sm text-muted-foreground">Add evidence, then press <b className="text-foreground">Generate AI Defence</b>. ClaimCheck splits this message into separate claims and checks each one.</p>
             ) : null}

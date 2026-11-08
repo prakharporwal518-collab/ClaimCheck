@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { BarChart3, CalendarClock, Inbox, Settings } from 'lucide-react'
 import { api } from '../lib/api'
+import { gsap, ScrollTrigger, useMotionGSAP } from '../lib/gsap'
 import { Toast } from './ui'
 import { Navbar } from './blocks/navbar'
 import { Badge } from './ui/badge'
@@ -37,6 +38,21 @@ export default function AppShell() {
     return () => clearTimeout(t)
   }, [toast])
 
+  // Page transition: each route fades up into place.
+  const { pathname } = useLocation()
+  const main = useRef(null)
+  useMotionGSAP(() => {
+    gsap.fromTo(main.current, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power3.out', clearProps: 'transform' })
+  }, { scope: main, dependencies: [pathname] })
+
+  // Pages fill in after data loads, which moves scroll-reveal trigger points: re-measure them.
+  useEffect(() => {
+    let t
+    const ro = new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => ScrollTrigger.refresh(), 150) })
+    ro.observe(main.current)
+    return () => { ro.disconnect(); clearTimeout(t) }
+  }, [])
+
   const notify = useCallback((text, kind = 'info') => setToast({ text, kind }), [])
 
   const status = health && (health.offline ? (
@@ -57,7 +73,7 @@ export default function AppShell() {
           <div className="bg-pattern-dots fade-bottom absolute inset-0" />
         </div>
         <Navbar links={NAV} right={status} />
-        <main id="main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <main ref={main} id="main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <Outlet />
         </main>
         <footer className="border-t px-6 py-4 text-center text-xs text-muted-foreground">

@@ -7,6 +7,7 @@ import { CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/blocks/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Appear } from '@/components/motion-primitives/in-view'
 import { cn } from '@/lib/utils'
 
 // Response-deadline calendar: each open dispute sits on its PayPal response due
@@ -71,7 +72,9 @@ export default function Calendar() {
         <div className="flex items-center gap-2 text-muted-foreground" role="status"><Spinner /> Loading…</div>
       ) : (
         <Card className="overflow-x-auto">
-          <div className="grid min-w-[840px] grid-cols-7">
+          {/* Re-plays when you change week: day cells fade in, then the deadline chips pop in. */}
+          <Appear watch={offset} className="grid min-w-[840px] grid-cols-7" targets="[data-cal]" stagger={0.012} duration={0.3}
+            from={{ autoAlpha: 0, y: 6 }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
               <div key={d} className="border-b bg-muted px-3 py-2.5 text-xs font-semibold text-muted-foreground">{d}</div>
             ))}
@@ -79,13 +82,13 @@ export default function Calendar() {
               const k = dayKey(d)
               const past = d < new Date(new Date().toDateString())
               return (
-                <div key={k} className={cn('min-h-32 border-b border-r p-2', past && 'bg-muted/40')}>
+                <div key={k} data-cal="" className={cn('min-h-32 border-b border-r p-2', past && 'bg-muted/40')}>
                   <div className={cn('mb-1.5 text-xs font-semibold', k === today ? 'inline-flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground' : 'text-muted-foreground')}>
                     {d.getDate()}{d.getDate() === 1 || d === days[0] ? <span className="ml-1 font-normal">{d.toLocaleString('en', { month: 'short' })}</span> : null}
                   </div>
                   <div className="space-y-1">
                     {(events[k] || []).map(({ kind, r }) => (
-                      <Link key={kind + r.id} to={`/app/disputes/${r.id}`}
+                      <Link key={kind + r.id} to={`/app/disputes/${r.id}`} data-cal=""
                         className={cn('block rounded-lg px-2 py-1.5 text-xs leading-tight transition-opacity hover:opacity-85',
                           kind === 'due' ? cn('border', COLOR[r.label || 'none']) : 'border border-dashed border-subtle text-muted-foreground hover:bg-muted')}>
                         {kind === 'due' ? (
@@ -102,7 +105,7 @@ export default function Calendar() {
                 </div>
               )
             })}
-          </div>
+          </Appear>
         </Card>
       )}
     </div>
