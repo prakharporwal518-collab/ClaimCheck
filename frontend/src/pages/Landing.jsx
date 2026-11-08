@@ -26,7 +26,7 @@ const SPONSORS = [
   [Sparkles, 'Google Gemini', 'Strict-JSON calls for fact extraction, claim breakdown, cross-check and report. OCR first; vision only when needed. Retries, fallback model, cache.'],
   [LayoutGrid, 'AG Grid + AG Studio', 'Dispute inbox, claim-vs-evidence master-detail grid, editable evidence grid, and an AG Studio analytics dashboard with an AI assistant.'],
   [Cloud, 'Render', 'Docker web service from one Blueprint, with a Render Workflows task and a safety net that never lets an analysis get stuck.'],
-  [Code2, 'APIMatic ContextMatic', 'Gives the coding agent exact PayPal API methods and types while writing the PayPal client and Sandbox seed script.'],
+  [Code2, 'APIMatic ContextMatic', 'Reviewed our PayPal client against PayPal\'s Disputes and Webhooks specs in Cursor. It found webhook-verification and upload gaps, which we fixed and tested.'],
 ]
 
 const ROADMAP = [

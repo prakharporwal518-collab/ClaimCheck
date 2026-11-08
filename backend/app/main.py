@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
 import re
 import threading
@@ -536,7 +537,8 @@ def submit(dispute_id: str, body: SubmitIn, request: Request):
         except PayPalError as e:
             audit(s, d.id, "submit_failed", status=e.status, body=str(e.body)[:500])
             s.commit()
-            raise HTTPException(502, f"PayPal rejected the submission ({e.status}): {e.body}")
+            raise HTTPException(502 if e.body is not None else (e.status or 502),
+                                f"PayPal rejected the submission ({e.status}): {e.body}" if e.body is not None else str(e))
         d.decision = "submitted"
         d.status = "UNDER_REVIEW"
         audit(s, d.id, "submitted_to_paypal", mode=client.mode, files=len(files),
@@ -559,7 +561,8 @@ def accept_claim(dispute_id: str, body: AcceptIn, request: Request):
         try:
             resp = client.accept_claim(d.id, note, get_playbook(d.reason)["accept_claim_reason"])
         except PayPalError as e:
-            raise HTTPException(502, f"PayPal rejected accept-claim ({e.status}): {e.body}")
+            raise HTTPException(502 if e.body is not None else (e.status or 502),
+                                f"PayPal rejected accept-claim ({e.status}): {e.body}" if e.body is not None else str(e))
         d.decision = "refunded"
         d.status = "RESOLVED"
         d.outcome = "lost"
@@ -604,12 +607,18 @@ async def handle_webhook_event(event: dict, source: str | None = None) -> dict:
 
 @app.post("/api/webhooks/paypal")
 async def paypal_webhook(request: Request):
-    event = await request.json()
+    raw = await request.body()
+    try:
+        event = json.loads(raw)
+    except ValueError:
+        raise HTTPException(400, "Webhook body is not valid JSON")
+    if not isinstance(event, dict):
+        raise HTTPException(400, "Webhook body must be a JSON object")
     # Real PayPal webhooks come from the Sandbox when it is enabled.
     source = "sandbox" if "sandbox" in enabled_sources() else enabled_sources()[0]
     client = get_client(source)
     try:
-        ok = client.verify_webhook(dict(request.headers), event)
+        ok = client.verify_webhook(dict(request.headers), raw)
     except PayPalError as e:
         raise HTTPException(400, f"Webhook verification error: {e}")
     if not ok:
