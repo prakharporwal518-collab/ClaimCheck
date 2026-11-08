@@ -137,7 +137,7 @@ backend/
   scripts/        sample-evidence generator, PayPal Sandbox seed script
   sample_evidence/  the three demo evidence sets + orders_export.csv
   tests/          pytest (masking, scoring, pipeline, API, PII-leak, AI chat, Hindi OCR, batching)
-frontend/         React + Vite + Tailwind + AG Grid + AG Studio
+frontend/         React + Vite + Tailwind v4 (shadcn-style tokens, light/dark) + Motion + lucide + AG Grid + AG Studio
 docs/             Postman collection, screenshots
 Dockerfile, render.yaml
 ```

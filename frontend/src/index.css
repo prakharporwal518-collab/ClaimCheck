@@ -1,39 +1,204 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --color-brand-50: #eff4ff;
-  --color-brand-100: #dbe6fe;
-  --color-brand-200: #bfd3fe;
-  --color-brand-500: #3b6ef5;
-  --color-brand-600: #1d4ed8;
-  --color-brand-700: #1e40af;
-  --color-brand-900: #0b1f44;
-  --color-contra: #dc2626;
-  --color-support: #16a34a;
-  --color-unver: #94a3b8;
+/* Class-based dark mode: <html class="dark"> (set in index.html before paint, toggled in lib/theme.js) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens (shadcn-style). Every colour in the app comes from here, so
+   light and dark mode stay consistent and contrast is checked in one place.
+   --------------------------------------------------------------------------- */
+:root {
+  --radius: 0.75rem;
+
+  --background: #f6f8fb;
+  --foreground: #0b1324;
+  --card: #ffffff;
+  --card-foreground: #0b1324;
+  --muted: #f0f3f8;
+  --muted-foreground: #526077;
+  --subtle-foreground: #5d697e;
+  --border: #e2e7ef;
+  --input: #d5dce7;
+  --ring: #2f5ae6;
+
+  --primary: #2a52d9;
+  --primary-hover: #2245bd;
+  --primary-foreground: #ffffff;
+  --primary-text: #2342b8; /* links and accents on light surfaces */
+  --accent: #eef3ff;
+  --accent-foreground: #1d3a9e;
+
+  --success: #12804a;
+  --success-bg: #e9f8ef;
+  --success-fg: #0b5f36;
+  --success-border: #a7e3c0;
+  --warning: #b45309;
+  --warning-bg: #fff6e5;
+  --warning-fg: #8a3b06;
+  --warning-border: #f6d28a;
+  --danger: #d0303a;
+  --danger-hover: #b5242e;
+  --danger-bg: #fdeeee;
+  --danger-fg: #a1202a;
+  --danger-border: #f5c2c5;
+  --info-bg: #eef3ff;
+  --info-fg: #1d3a9e;
+  --info-border: #c9d6fb;
+
+  --pattern: rgba(15, 30, 60, 0.07); /* grid/dot backgrounds */
+  --grad-a: #2a52d9; --grad-b: #5a3fd1; --grad-c: #0f766e; /* hero gradient text, AA on light */
+  --glow-opacity: 0.55;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.04);
+  --shadow-pop: 0 12px 32px -12px rgba(16, 24, 40, 0.25);
+  color-scheme: light;
 }
 
-html, body, #root { height: 100%; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
+.dark {
+  --background: #060a13;
+  --foreground: #e7ecf5;
+  --card: #0d1422;
+  --card-foreground: #e7ecf5;
+  --muted: #131c2e;
+  --muted-foreground: #9aa8bf;
+  --subtle-foreground: #8391a8;
+  --border: #1e2a40;
+  --input: #2a3852;
+  --ring: #6d8fff;
 
-@utility card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50; }
-@utility btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm; }
-@utility btn-ghost { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
-@utility btn-success { @apply btn bg-emerald-600 text-white hover:bg-emerald-700; }
-@utility chip { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold; }
-@utility label { @apply text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  --primary: #3d63ec;
+  --primary-hover: #4f73f2;
+  --primary-foreground: #ffffff;
+  --primary-text: #93adff;
+  --accent: #15204a;
+  --accent-foreground: #c3d2ff;
 
-/* Inbox: rows due in 3 days or less */
-.ag-row.row-urgent { background-color: #fef2f2 !important; }
-.ag-row.row-urgent .ag-cell { color: #991b1b; }
-.ag-row.row-linked { background-color: #eff6ff !important; }
+  --success: #34c27a;
+  --success-bg: rgba(52, 194, 122, 0.12);
+  --success-fg: #7ee2ad;
+  --success-border: rgba(52, 194, 122, 0.32);
+  --warning: #f0a93b;
+  --warning-bg: rgba(240, 169, 59, 0.12);
+  --warning-fg: #f7c97f;
+  --warning-border: rgba(240, 169, 59, 0.32);
+  --danger: #f0525c;
+  --danger-hover: #f26b73;
+  --danger-bg: rgba(240, 82, 92, 0.12);
+  --danger-fg: #ff9ea4;
+  --danger-border: rgba(240, 82, 92, 0.34);
+  --info-bg: rgba(109, 143, 255, 0.12);
+  --info-fg: #b3c6ff;
+  --info-border: rgba(109, 143, 255, 0.32);
 
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(220,38,38,.5) } 100% { box-shadow: 0 0 0 10px rgba(220,38,38,0) } }
+  --pattern: rgba(170, 190, 230, 0.07);
+  --grad-a: #9db4ff; --grad-b: #c4b5fd; --grad-c: #5eead4;
+  --glow-opacity: 0.9;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-border: var(--danger-border);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-info-border: var(--info-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+}
+
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  * { border-color: var(--border); }
+  ::selection { background: color-mix(in srgb, var(--primary) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  input, textarea, select { color: var(--foreground); }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+/* Small shared text style for field labels */
+@utility eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground; }
+
+/* ---------------------------------------------------------------------------
+   Backgrounds from public/bg/. Patterns are used as masks so they take the
+   theme's --pattern colour in both light and dark mode.
+   --------------------------------------------------------------------------- */
+/* Pattern + optional fade are combined in one mask list, so the fade never replaces the pattern. */
+.bg-pattern-grid,
+.bg-pattern-dots {
+  --pat: none; --pat-size: 40px 40px; --fade: linear-gradient(#000, #000);
+  background-color: var(--pattern);
+  -webkit-mask-image: var(--pat), var(--fade);
+  mask-image: var(--pat), var(--fade);
+  -webkit-mask-size: var(--pat-size), 100% 100%;
+  mask-size: var(--pat-size), 100% 100%;
+  -webkit-mask-repeat: repeat, no-repeat;
+  mask-repeat: repeat, no-repeat;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.bg-pattern-grid { --pat: url(/bg/grid.svg); --pat-size: 40px 40px; }
+.bg-pattern-dots { --pat: url(/bg/dots.svg); --pat-size: 22px 22px; }
+.fade-edges { --fade: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
+.fade-bottom { --fade: linear-gradient(to bottom, #000 20%, transparent); }
+.bg-glow { background: url(/bg/glow.svg) center top / cover no-repeat; opacity: var(--glow-opacity); }
+.bg-waves { -webkit-mask: url(/bg/waves.svg) center bottom / 100% 100% no-repeat; mask: url(/bg/waves.svg) center bottom / 100% 100% no-repeat; }
+
+/* ---------------------------------------------------------------------------
+   AG Grid row states (colours follow the theme)
+   --------------------------------------------------------------------------- */
+.ag-row.row-urgent { background-color: var(--danger-bg) !important; }
+.ag-row.row-urgent .ag-cell { color: var(--danger-fg); }
+.ag-row.row-linked { background-color: var(--accent) !important; }
+
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent) } 100% { box-shadow: 0 0 0 10px transparent } }
 .flag-pop { animation: pulse-ring 1.2s ease-out 2; }
 
 /* Let grid columns shrink on phones (AG Grid scrolls inside its own box). */
 .grid > * { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

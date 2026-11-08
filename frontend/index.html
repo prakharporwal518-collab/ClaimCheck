@@ -8,7 +8,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#060a13" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f8fb" media="(prefers-color-scheme: light)" />
     <title>ClaimCheck – AI dispute defence</title>
+    <script>
+      // Apply the saved or system theme before first paint (no flash).
+      (function () {
+        var t = null
+        try { t = localStorage.getItem('claimcheck-theme') } catch (e) {}
+        if (t !== 'light' && t !== 'dark') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.classList.toggle('dark', t === 'dark')
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

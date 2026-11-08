@@ -1,24 +1,27 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import { BarChart3, CalendarClock, Inbox, Settings } from 'lucide-react'
 import { api } from '../lib/api'
-import { Logo, Toast } from './ui'
+import { Toast } from './ui'
+import { Navbar } from './blocks/navbar'
+import { Badge } from './ui/badge'
 
 const AppCtx = createContext(null)
 export const useApp = () => useContext(AppCtx)
 
 const NAV = [
-  ['/app', 'Inbox', true],
-  ['/app/calendar', 'Deadlines'],
-  ['/app/analytics', 'Analytics'],
-  ['/app/settings', 'Settings'],
+  { to: '/app', label: 'Inbox', icon: Inbox, end: true },
+  { to: '/app/calendar', label: 'Deadlines', icon: CalendarClock },
+  { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/app/settings', label: 'Settings', icon: Settings },
 ]
 
-function Badge({ ok, on, off }) {
+function Status({ ok, on, off }) {
   return (
-    <span className={`chip ${ok ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+    <Badge tone={ok ? 'success' : 'neutral'}>
+      <span className={`size-1.5 rounded-full ${ok ? 'bg-success' : 'bg-subtle'}`} aria-hidden="true" />
       {ok ? on : off}
-    </span>
+    </Badge>
   )
 }
 
@@ -34,50 +37,30 @@ export default function AppShell() {
     return () => clearTimeout(t)
   }, [toast])
 
-  const notify = (text, kind = 'info') => setToast({ text, kind })
+  const notify = useCallback((text, kind = 'info') => setToast({ text, kind }), [])
+
+  const status = health && (health.offline ? (
+    <Badge tone="danger">API offline</Badge>
+  ) : (
+    <>
+      <Status ok={health.paypal_sources?.includes('sandbox')}
+        on={health.paypal_sources?.includes('mock') ? 'PayPal Sandbox + demo data' : 'PayPal Sandbox'} off="PayPal: seeded demo" />
+      <Status ok={health.gemini} on={health.gemini_model} off="AI: rules engine" />
+      <Status ok={health.render_workflows} on="Render Workflows" off="In-process jobs" />
+    </>
+  ))
 
   return (
     <AppCtx.Provider value={{ health, notify }}>
-      <div className="flex min-h-full flex-col">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-[1500px] items-center gap-6 px-4 py-3 sm:px-6">
-            <Link to="/" className="flex items-center gap-2 font-extrabold tracking-tight text-brand-900">
-              <Logo /> ClaimCheck
-            </Link>
-            <nav className="flex gap-1 overflow-x-auto">
-              {NAV.map(([to, label, end]) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap ${isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'}`
-                  }
-                >
-                  {label}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="ml-auto hidden items-center gap-2 lg:flex">
-              {health?.offline && <span className="chip bg-rose-100 text-rose-700">API offline</span>}
-              {health && !health.offline && (
-                <>
-                  <Badge
-                    ok={health.paypal_sources?.includes('sandbox')}
-                    on={health.paypal_sources?.includes('mock') ? 'PayPal Sandbox + demo data' : 'PayPal Sandbox'}
-                    off="PayPal: seeded demo"
-                  />
-                  <Badge ok={health.gemini} on={health.gemini_model} off="AI: rules engine" />
-                  <Badge ok={health.render_workflows} on="Render Workflows" off="In-process jobs" />
-                </>
-              )}
-            </div>
-          </div>
-        </header>
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 sm:px-6">
+      <div className="relative flex min-h-screen flex-col">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 overflow-hidden">
+          <div className="bg-pattern-dots fade-bottom absolute inset-0" />
+        </div>
+        <Navbar links={NAV} right={status} />
+        <main id="main" className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <Outlet />
         </main>
-        <footer className="border-t border-slate-200 bg-white px-6 py-3 text-center text-xs text-slate-500">
+        <footer className="border-t px-6 py-4 text-center text-xs text-muted-foreground">
           ClaimCheck drafts; you decide. Nothing is sent to PayPal until you approve it. Not legal advice.
         </footer>
       </div>

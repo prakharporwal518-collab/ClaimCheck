@@ -1,11 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AgStudio } from 'ag-studio-react'
-import { AgStudioAiModule, AgStudioLicenseManager, createAiHarness } from 'ag-studio'
+import { AgStudioAiModule, AgStudioLicenseManager, createAiHarness, studioTheme } from 'ag-studio'
 import '../lib/grid'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
 import { Spinner } from '../components/ui'
 import { buildReport } from '../lib/studioReport'
+import { BarChart3, CircleDollarSign, FolderOpen, Timer, Trophy } from 'lucide-react'
+import { PageHeader } from '@/components/blocks/page-header'
+import { StatCard } from '@/components/blocks/stat-card'
+import { Card } from '@/components/ui/card'
+import { Segmented } from '@/components/ui/segmented'
+import { InViewStagger } from '@/components/motion-primitives/in-view'
+import { cssVar, useTheme } from '@/lib/theme'
+
+/** AG Studio draws charts on a canvas, so it gets the theme's resolved colours (not CSS variables). */
+function studioColors() {
+  const c = (n) => cssVar(n)
+  return {
+    page: c('--muted'), widget: c('--card'), border: c('--border'), fg: c('--foreground'), muted: c('--muted-foreground'),
+    accent: c('--primary'), card: c('--card'), bg: c('--background'), dark: document.documentElement.classList.contains('dark'),
+  }
+}
 
 /**
  * AG Studio has no built-in model: Studio calls this adapter for each AI turn,
@@ -70,7 +86,19 @@ export default function Analytics() {
       },
     [rows],
   )
-  const initialState = useMemo(() => buildReport(), [])
+  const { theme } = useTheme()
+  const colors = useMemo(() => studioColors(), [theme]) // eslint-disable-line react-hooks/exhaustive-deps
+  const initialState = useMemo(() => buildReport(colors), [colors])
+  const agTheme = useMemo(() => studioTheme.withParams({
+    fontFamily: 'Inter, ui-sans-serif, system-ui',
+    browserColorScheme: colors.dark ? 'dark' : 'light',
+    backgroundColor: colors.card, foregroundColor: colors.fg, textColor: colors.fg, subtleTextColor: colors.muted,
+    borderColor: colors.border, accentColor: colors.accent, menuBackgroundColor: colors.card, menuTextColor: colors.fg,
+    iconColor: colors.muted, studioWrapperBackgroundColor: colors.page, studioPanelContainerBackgroundColor: colors.card,
+    chartTextColor: colors.fg, chartSubtleTextColor: colors.muted, chartAxisLabelColor: colors.muted, chartAxisTitleColor: colors.muted,
+    chartGridLineColor: colors.border, chartAxisLineColor: colors.border, chartBorderColor: colors.border,
+    chartTooltipBackgroundColor: colors.card, chartTooltipTextColor: colors.fg, chartAccentColor: colors.accent,
+  }), [colors])
   const ai = useMemo(
     () => (params) =>
       createAiHarness(params.api, { adapter: geminiAdapter, promptStarters: PROMPTS }),
@@ -81,42 +109,28 @@ export default function Analytics() {
   const resolved = (rows || []).filter((r) => r.outcome !== 'Pending')
   const won = resolved.filter((r) => r.outcome === 'Won').length
 
+  const timed = (rows || []).filter((r) => r.response_minutes != null)
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-sm text-slate-500">
-            Built with AG Studio. Switch to <b>Edit</b> to drag fields into new charts, or open the <b>AI assistant</b> panel and ask a question
-            {health && !health.gemini && <> (needs a Gemini key on the backend)</>}.
-          </p>
-        </div>
-        <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-sm font-semibold">
-          {['view', 'edit'].map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1.5 ${mode === m ? 'bg-slate-900 text-white' : 'text-slate-600'}`}>
-              {m === 'view' ? 'View' : 'Edit + AI assistant'}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={BarChart3}
+        title="Analytics"
+        description={<>Built with AG Studio. Switch to <b className="text-foreground">Edit</b> to drag fields into new charts, or open the <b className="text-foreground">AI assistant</b> panel and ask a question{health && !health.gemini && <> (needs a Gemini key on the backend)</>}.</>}
+        actions={<Segmented label="Dashboard mode" value={mode} onChange={setMode} options={[['view', 'View'], ['edit', 'Edit + AI assistant']]} />}
+      />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          ['Money at risk', money(open.reduce((s, r) => s + r.amount, 0))],
-          ['Open disputes', open.length],
-          ['Win rate (resolved)', resolved.length ? `${Math.round((won / resolved.length) * 100)}%` : '—'],
-          ['Avg time to draft', (() => { const t = (rows || []).filter((r) => r.response_minutes != null); return t.length ? `${(t.reduce((s, r) => s + r.response_minutes, 0) / t.length).toFixed(1)} min` : '—' })()],
-        ].map(([label, value]) => (
-          <div key={label} className="card px-4 py-3">
-            <div className="label">{label}</div>
-            <div className="mt-1 text-2xl font-bold">{value}</div>
-          </div>
-        ))}
-      </div>
+      <InViewStagger className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Money at risk" icon={CircleDollarSign} value={rows ? rows.reduce((s_, r) => s_ + (r.money_at_risk || 0), 0) : undefined} format={(v) => money(v)} hint="Disputes not resolved yet" />
+        <StatCard label="Open disputes" icon={FolderOpen} value={rows ? open.length : undefined} />
+        <StatCard label="Win rate (resolved)" icon={Trophy} tone="success" value={resolved.length ? Math.round((won / resolved.length) * 100) : '—'} suffix="%" />
+        <StatCard label="Avg time to draft" icon={Timer} value={timed.length ? timed.reduce((s_, r) => s_ + r.response_minutes, 0) / timed.length : '—'} format={(v) => v.toFixed(1)} suffix=" min" />
+      </InViewStagger>
 
-      <div className="card overflow-hidden" style={{ height: 900 }}>
+      <Card className="overflow-hidden" style={{ height: 900 }}>
         {data ? (
           <AgStudio
+            key={theme}
+            theme={agTheme}
             data={data}
             mode={mode}
             initialState={initialState}
@@ -128,9 +142,9 @@ export default function Analytics() {
             onApiReady={(e) => { if (import.meta.env.DEV) window.__studio = e.api }}
           />
         ) : (
-          <div className="flex h-full items-center justify-center gap-2 text-slate-500"><Spinner /> Loading data…</div>
+          <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status"><Spinner /> Loading data…</div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

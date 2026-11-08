@@ -1,12 +1,13 @@
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { MotionConfig } from 'motion/react'
 import './index.css'
 import AppShell from './components/AppShell'
 import Landing from './pages/Landing'
 import { Spinner } from './components/ui'
 
-// The landing page stays light; grids and AG Studio load with the app pages.
+// The landing page loads first; grids and AG Studio load with the app pages.
 const Inbox = lazy(() => import('./pages/Inbox'))
 const Dispute = lazy(() => import('./pages/Dispute'))
 const Calendar = lazy(() => import('./pages/Calendar'))
@@ -14,7 +15,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 
 const page = (El, label = 'Loading…') => (
-  <Suspense fallback={<div className="flex items-center gap-2 text-slate-500"><Spinner /> {label}</div>}>
+  <Suspense fallback={<div className="flex items-center gap-2 text-muted-foreground" role="status"><Spinner /> {label}</div>}>
     <El />
   </Suspense>
 )
@@ -36,6 +37,9 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    {/* Respect the viewer's "reduce motion" setting everywhere */}
+    <MotionConfig reducedMotion="user">
+      <RouterProvider router={router} />
+    </MotionConfig>
   </StrictMode>,
 )

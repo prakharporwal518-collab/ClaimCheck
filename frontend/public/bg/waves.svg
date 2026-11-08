@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="320" viewBox="0 0 1440 320" preserveAspectRatio="none">
+  <path d="M0 192c120 32 240 64 384 48s288-80 432-96 288 16 384 48 168 48 240 48V320H0Z" fill="#000" fill-opacity=".9"/>
+  <path d="M0 240c160-16 320-48 480-32s320 80 480 80 320-64 480-80V320H0Z" fill="#000" fill-opacity=".6"/>
+</svg>
