@@ -55,8 +55,45 @@ class PayPalClient(ABC):
     @abstractmethod
     def accept_claim(self, dispute_id: str, note: str, reason: str = "LOST_IN_MAIL") -> dict: ...
 
-    def verify_webhook(self, headers: dict, event: dict) -> bool:
+    def verify_webhook(self, headers: dict, raw_body: bytes) -> bool:
         return True
+
+
+# PayPal's limits for provide-evidence files (Disputes API v1).
+EVIDENCE_MIME = {"application/pdf", "image/png", "image/jpeg", "image/gif"}
+MAX_FILE_BYTES = 10 * 1024 * 1024
+MAX_TOTAL_BYTES = 50 * 1024 * 1024
+WEBHOOK_HEADERS = ("paypal-auth-algo", "paypal-cert-url", "paypal-transmission-id",
+                   "paypal-transmission-sig", "paypal-transmission-time")
+
+
+def check_evidence_files(files: list[tuple[str, bytes, str]]) -> None:
+    """Refuse files PayPal would reject, before anything is sent."""
+    for name, data, mime in files:
+        if mime not in EVIDENCE_MIME:
+            raise PayPalError(f"{name}: PayPal only accepts PDF, PNG, JPG or GIF evidence", 422)
+        if len(data) > MAX_FILE_BYTES:
+            raise PayPalError(f"{name}: PayPal accepts files up to 10 MB", 422)
+    if sum(len(d) for _, d, _ in files) > MAX_TOTAL_BYTES:
+        raise PayPalError("PayPal accepts up to 50 MB of evidence per submission", 422)
+
+
+def _allows_action(dispute: dict, action: str) -> bool:
+    """PayPal lists the actions a dispute allows as HATEOAS links (e.g. rel "provide_evidence").
+    No links at all means we cannot tell, so we let PayPal decide."""
+    links = dispute.get("links") or []
+    if not links:
+        return True
+    return any(link.get("rel") == action.replace("-", "_") or str(link.get("href", "")).endswith("/" + action)
+               for link in links)
+
+
+def pick_accept_claim_type(dispute: dict) -> str:
+    """Use a type PayPal says this dispute allows, preferring a plain refund."""
+    allowed = ((dispute.get("allowed_response_options") or {}).get("accept_claim") or {}).get("accept_claim_types") or []
+    if not allowed or "REFUND" in allowed:
+        return "REFUND"
+    return allowed[0]
 
 
 # --------------------------------------------------------------------------
@@ -125,16 +162,23 @@ class SandboxClient(PayPalClient):
         return self._request("GET", f"{self.disputes}/{dispute_id}", headers={"Accept": "application/json"})
 
     def provide_evidence(self, dispute_id, evidences, files):
-        # multipart/form-data: one JSON part named "input", then the evidence files.
+        check_evidence_files(files)
+        if not _allows_action(self.get_dispute(dispute_id), "provide-evidence"):
+            raise PayPalError("PayPal does not accept evidence for this dispute right now", 409)
+        # multipart/form-data: a JSON form field named "input" (no filename), then the files.
         multipart: list[tuple[str, tuple]] = [
-            ("input", ("input.json", json.dumps({"evidences": evidences}), "application/json"))
+            ("input", (None, json.dumps({"evidences": evidences}), "application/json"))
         ]
         for name, data, mime in files:
-            multipart.append(("evidence_file", (name, data, mime)))
+            multipart.append(("evidence-file", (name, data, mime)))
         return self._request("POST", f"{self.disputes}/{dispute_id}/provide-evidence", files=multipart)
 
     def accept_claim(self, dispute_id, note, reason="LOST_IN_MAIL"):
-        payload = {"note": note[:2000], "accept_claim_reason": reason, "accept_claim_type": "REFUND"}
+        dispute = self.get_dispute(dispute_id)
+        if not _allows_action(dispute, "accept-claim"):
+            raise PayPalError("PayPal does not allow accepting this claim right now", 409)
+        payload = {"note": note[:2000], "accept_claim_reason": reason,
+                   "accept_claim_type": pick_accept_claim_type(dispute)}
         return self._request(
             "POST",
             f"{self.disputes}/{dispute_id}/accept-claim",
@@ -142,26 +186,30 @@ class SandboxClient(PayPalClient):
             headers={"Content-Type": "application/json"},
         )
 
-    def verify_webhook(self, headers: dict, event: dict) -> bool:
+    def verify_webhook(self, headers: dict, raw_body: bytes) -> bool:
         if not settings.paypal_webhook_id:
-            return True  # verification not configured (local testing)
+            raise PayPalError("PAYPAL_WEBHOOK_ID is not set, so PayPal webhooks cannot be verified")
         h = {k.lower(): v for k, v in headers.items()}
-        payload = {
-            "auth_algo": h.get("paypal-auth-algo"),
-            "cert_url": h.get("paypal-cert-url"),
-            "transmission_id": h.get("paypal-transmission-id"),
-            "transmission_sig": h.get("paypal-transmission-sig"),
-            "transmission_time": h.get("paypal-transmission-time"),
+        if any(not h.get(name) for name in WEBHOOK_HEADERS):
+            return False  # not signed by PayPal
+        fields = {
+            "auth_algo": h["paypal-auth-algo"],
+            "cert_url": h["paypal-cert-url"],
+            "transmission_id": h["paypal-transmission-id"],
+            "transmission_sig": h["paypal-transmission-sig"],
+            "transmission_time": h["paypal-transmission-time"],
             "webhook_id": settings.paypal_webhook_id,
-            "webhook_event": event,
         }
-        body = self._request(
+        # The signature covers the exact bytes PayPal sent, so embed the original body
+        # instead of a re-serialised copy (key order or spacing could differ).
+        body = json.dumps(fields)[:-1] + ', "webhook_event": ' + raw_body.decode("utf-8") + "}"
+        resp = self._request(
             "POST",
             "/v1/notifications/verify-webhook-signature",
-            json=payload,
+            content=body.encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
-        return body.get("verification_status") == "SUCCESS"
+        return resp.get("verification_status") == "SUCCESS"
 
 
 # --------------------------------------------------------------------------
@@ -198,6 +246,7 @@ class MockClient(PayPalClient):
         return self._store[dispute_id]
 
     def provide_evidence(self, dispute_id, evidences, files):
+        check_evidence_files(files)
         d = self.get_dispute(dispute_id)
         d["status"] = "UNDER_REVIEW"
         d["update_time"] = mock_data.iso(datetime.utcnow())

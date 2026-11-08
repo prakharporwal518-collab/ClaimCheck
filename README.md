@@ -52,7 +52,7 @@ cd backend && python -m pytest -q
 | `SANDBOX_ACTIONS_KEY` | – | Optional: asked before Submit/Refund on real Sandbox disputes, so visitors can't use them up |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | – | Sandbox REST app credentials |
 | `PAYPAL_DISPUTES_PATH` | `/v1/customer/disputes` | Base path, kept as one setting so a v2 switch is a one-line change |
-| `PAYPAL_WEBHOOK_ID` | – | Turns on webhook signature verification |
+| `PAYPAL_WEBHOOK_ID` | – | Needed for real PayPal Sandbox webhooks: every webhook is verified with PayPal, and without this ID they are refused |
 | `GEMINI_API_KEY` | – | Uses Gemini instead of the rules engine |
 | `OCR_LANGS` | `eng+hin` | Tesseract languages (missing packs are skipped) |
 | `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | `gemini-3.6-flash` / `gemini-3.5-flash-lite` | Primary and fallback models |
@@ -110,7 +110,18 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 - **Set up the Workflow**: in the Render dashboard, New → Workflow, same repo, root directory `backend`, build `pip install -r requirements.txt`, start `python workflows/main.py`, name `claimcheck-workflows`, with the same `DATABASE_URL` and `GEMINI_API_KEY`. Then set `DATABASE_URL` and `RENDER_API_KEY` on the web service (`USE_RENDER_WORKFLOWS=true` is already in `render.yaml`). The Workflow runtime has no Tesseract, so images there go straight to Gemini vision.
 
 ### APIMatic ContextMatic
-ContextMatic gives a coding agent exact PayPal API methods, types and auth patterns. **To do before submitting:** install it in your editor, run `/onboard-context-matic`, check its catalog for the Disputes API, and use it to review or regenerate `backend/app/paypal/client.py` and `backend/scripts/sandbox_seed.py`. Then fill in this section with what it changed, for example the multipart field names for `provide-evidence` and the `accept-claim` body, and keep a short screen recording for Devpost. (The current client was written without ContextMatic, so don't claim it until you have used it.)
+We used the ContextMatic MCP plugin in Cursor to review `backend/app/paypal/client.py` against PayPal's official API definitions. Its PayPal SDK catalogue covers Orders and Payments but not Disputes, so the agent used ContextMatic to pull PayPal's Disputes v1 OpenAPI spec, the Disputes integration guide and Webhooks v1. The review found these gaps, which we then fixed and covered with tests (`backend/tests/test_paypal_client.py`):
+
+| Area | What ContextMatic flagged | Fix |
+|---|---|---|
+| Webhooks | The signature check re-serialised the parsed JSON instead of using the exact bytes PayPal signed | Verify with the original request body, byte for byte |
+| Webhooks | Missing PayPal headers were sent as `null`; with no `PAYPAL_WEBHOOK_ID` every webhook was accepted | Unsigned requests are refused without calling PayPal; no webhook ID means webhooks are refused |
+| provide-evidence | `input` was sent as a file part; the file field name didn't match the spec (`evidence-file`) | `input` is a plain JSON form field; files use `evidence-file` |
+| provide-evidence | PayPal's file rules weren't checked in the client; no check that the dispute still accepts evidence | PDF/PNG/JPG/GIF, ≤10 MB each, ≤50 MB total, checked before sending; the dispute's `provide_evidence` link must be present |
+| accept-claim | `accept_claim_type` was always `REFUND` | Picked from the dispute's `allowed_response_options` (REFUND preferred) |
+
+Not changed: ContextMatic noted `accept_claim_reason` isn't in the current OpenAPI file, but the real Sandbox accepted it (`LOST_IN_MAIL`) when we refunded PP-R-GQK-10196955, so we kept it.
+
 
 ### Roadmap (not built)
 Kernel (live carrier tracking check, against forged PDFs), Channel3 (product data for "Not as Described"), Elastic (search similar past disputes), Astropods (long-lived hosted agent), Bryntum (richer deadline scheduler; the current calendar in `Calendar.jsx` is built in-house), carrier APIs and Shopify/WooCommerce integrations, Presidio NER masking.
