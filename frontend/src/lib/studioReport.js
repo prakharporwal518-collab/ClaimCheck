@@ -3,7 +3,7 @@
 const f = (id, aggregation) => (aggregation ? { id: `disputes.${id}`, aggregation } : { id: `disputes.${id}` })
 const title = (text) => ({ title: { enabled: true, text } })
 
-export function buildReport() {
+export function buildReport(colors = {}) {
   const widgets = {
     risk: { type: 'value', dataMapping: { value: [f('money_at_risk', 'sum')] }, format: title('Money at risk (USD)') },
     avg: { type: 'value', dataMapping: { value: [f('score', 'avg')] }, format: title('Average evidence strength (0-10)') },
@@ -47,7 +47,15 @@ export function buildReport() {
     grid: { xTrack: 4, yTrack: 7, xSpan: 8, ySpan: 5 },
   }
   return {
-    pages: [{ id: 'overview', widgets, widgetLayout, layout: { columns: 12, rowHeight: 64 } }],
+    pages: [{
+      id: 'overview', widgets, widgetLayout,
+      layout: {
+        columns: 12, rowHeight: 64,
+        // Canvas and widget colours follow the app theme (light/dark).
+        ...(colors.page && { backgroundColor: colors.page }),
+        ...(colors.widget && { widgetBackgroundColor: colors.widget, widgetBorderColor: colors.border, widgetBorderEnabled: true }),
+      },
+    }],
     selectedPageId: 'overview',
   }
 }

@@ -6,39 +6,45 @@ import { gridTheme } from '../lib/grid'
 import { daysLabel, money, statusText } from '../lib/format'
 import { ScorePill, Spinner } from '../components/ui'
 import { useApp } from '../components/AppShell'
+import { AlarmClock, CircleDollarSign, FolderOpen, Gauge, Inbox as InboxIcon, RefreshCw, Search, Zap, AlertTriangle } from 'lucide-react'
+import { PageHeader } from '@/components/blocks/page-header'
+import { StatCard } from '@/components/blocks/stat-card'
+import { DataTableCard } from '@/components/blocks/data-table'
+import { InViewStagger } from '@/components/motion-primitives/in-view'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Segmented } from '@/components/ui/segmented'
 
 const isOpen = (r) => r.status === 'WAITING_FOR_SELLER_RESPONSE'
 
 function DaysLeft({ data }) {
-  if (!isOpen(data)) return <span className="text-slate-400">—</span>
+  if (!isOpen(data)) return <span className="text-subtle">—</span>
   const urgent = data.days_left <= 3
   return (
-    <span className={`font-mono font-semibold ${urgent ? 'text-rose-700' : 'text-slate-700'}`}>
-      {urgent && '⚠ '}
+    <span className={`inline-flex items-center gap-1 font-mono font-semibold tabular ${urgent ? 'text-danger-fg' : 'text-foreground'}`}>
+      {urgent && <AlertTriangle className="size-3.5" aria-label="Due soon" />}
       {daysLabel(data.days_left)}
     </span>
   )
 }
 
 function Status({ data }) {
-  const cls = isOpen(data)
-    ? 'bg-amber-50 text-amber-800 ring-amber-200'
-    : ['UNDER_REVIEW', 'WAITING_FOR_BUYER_RESPONSE', 'OTHER'].includes(data.status)
-      ? 'bg-blue-50 text-blue-800 ring-blue-200'
-      : 'bg-slate-100 text-slate-600 ring-slate-200'
-  return <span className={`chip ring-1 ${cls}`}>{statusText(data.status)}</span>
+  const tone = isOpen(data) ? 'warning'
+    : ['UNDER_REVIEW', 'WAITING_FOR_BUYER_RESPONSE', 'OTHER'].includes(data.status) ? 'info' : 'neutral'
+  return <Badge tone={tone}>{statusText(data.status)}</Badge>
 }
 
 function NextStep({ data }) {
   if (data.analysis_state === 'queued' || data.analysis_state === 'running')
-    return <span className="flex items-center gap-1.5 text-brand-700"><Spinner className="h-3.5 w-3.5" /> Drafting…</span>
-  if (data.decision === 'submitted') return <span className="text-blue-700">Evidence sent</span>
-  if (data.decision === 'refunded') return <span className="text-slate-600">Refunded</span>
-  if (!isOpen(data)) return <span className="text-slate-400">{data.outcome === 'won' ? 'Won' : data.outcome === 'lost' ? 'Lost' : '—'}</span>
-  if (!data.label) return <span className="text-slate-500">Add evidence</span>
+    return <span className="flex items-center gap-1.5 text-primary-text"><Spinner className="size-3.5" /> Drafting…</span>
+  if (data.decision === 'submitted') return <span className="text-info-fg">Evidence sent</span>
+  if (data.decision === 'refunded') return <span className="text-muted-foreground">Refunded</span>
+  if (!isOpen(data)) return <span className="text-subtle">{data.outcome === 'won' ? 'Won' : data.outcome === 'lost' ? 'Lost' : '—'}</span>
+  if (!data.label) return <span className="text-muted-foreground">Add evidence</span>
   return data.recommendation === 'refund'
-    ? <span className="font-semibold text-rose-700">Recommend refund</span>
-    : <span className="font-semibold text-emerald-700">Draft ready</span>
+    ? <span className="font-semibold text-danger-fg">Recommend refund</span>
+    : <span className="font-semibold text-success-fg">Draft ready</span>
 }
 
 export default function Inbox() {
@@ -77,7 +83,7 @@ export default function Inbox() {
       open: open.length,
       atRisk: open.reduce((s, r) => s + r.amount, 0),
       urgent: open.filter((r) => r.days_left <= 3).length,
-      avg: scored.length ? (scored.reduce((s, r) => s + r.score, 0) / scored.length).toFixed(1) : '—',
+      avg: scored.length ? scored.reduce((s, r) => s + r.score, 0) / scored.length : null,
     }
   }, [rows])
 
@@ -86,16 +92,14 @@ export default function Inbox() {
       { field: 'id', headerName: 'Dispute', width: 130, cellClass: 'font-mono text-xs', pinned: 'left' },
       { field: 'buyer', headerName: 'Buyer', flex: 1, minWidth: 140 },
       {
-        field: 'source', headerName: 'Source', width: 135, filter: 'agSetColumnFilter',
+        field: 'source', headerName: 'Source', width: 160, filter: 'agSetColumnFilter',
         valueFormatter: (p) => (p.value === 'sandbox' ? 'PayPal Sandbox' : 'Demo data'),
-        cellRenderer: (p) => p.value === 'sandbox'
-          ? <span className="chip bg-blue-50 text-blue-800 ring-1 ring-blue-200">PayPal Sandbox</span>
-          : <span className="chip bg-slate-100 text-slate-600">Demo data</span>,
+        cellRenderer: (p) => p.value === 'sandbox' ? <Badge tone="info">PayPal Sandbox</Badge> : <Badge>Demo data</Badge>,
       },
       { field: 'item', headerName: 'Item', flex: 1.4, minWidth: 200 },
       {
         field: 'amount', headerName: 'Amount', width: 110, type: 'rightAligned',
-        valueFormatter: (p) => money(p.value, p.data.currency),
+        valueFormatter: (p) => money(p.value, p.data.currency), cellClass: 'tabular',
       },
       { field: 'reason_label', headerName: 'Reason', width: 150, filter: 'agSetColumnFilter' },
       {
@@ -131,65 +135,55 @@ export default function Inbox() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dispute inbox</h1>
-          <p className="text-sm text-slate-500">Item Not Received disputes from PayPal, sorted by response deadline.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-ghost" disabled={!!busy}
-            onClick={() => run('sync', api.sync, (r) => {
-              const parts = Object.entries(r.sources || {}).map(([k, v]) => `${k === 'sandbox' ? 'PayPal Sandbox' : 'demo data'}: ${v.error ? 'error – ' + v.error : `${v.listed} listed, ${v.new} new`}`)
-              return `Synced. ${parts.join(' · ')}`
-            })}>
-            {busy === 'sync' ? <Spinner /> : '↻'} Sync from PayPal
-          </button>
-          {health?.paypal_sources?.includes('mock') && (
-            <button className="btn-primary" disabled={!!busy}
-              onClick={() => run('sim', api.simulate, (r) => `Webhook CUSTOMER.DISPUTE.CREATED → ${r.dispute_id} synced, drafting a defence…`)}>
-              {busy === 'sim' ? <Spinner /> : '⚡'} Simulate new dispute (webhook)
-            </button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={InboxIcon}
+        title="Dispute inbox"
+        description="Item Not Received disputes from PayPal, sorted by response deadline."
+        actions={
+          <>
+            <Button variant="outline" disabled={!!busy}
+              onClick={() => run('sync', api.sync, (r) => {
+                const parts = Object.entries(r.sources || {}).map(([k, v]) => `${k === 'sandbox' ? 'PayPal Sandbox' : 'demo data'}: ${v.error ? 'error – ' + v.error : `${v.listed} listed, ${v.new} new`}`)
+                return `Synced. ${parts.join(' · ')}`
+              })}>
+              {busy === 'sync' ? <Spinner /> : <RefreshCw />} Sync from PayPal
+            </Button>
+            {health?.paypal_sources?.includes('mock') && (
+              <Button disabled={!!busy}
+                onClick={() => run('sim', api.simulate, (r) => `Webhook CUSTOMER.DISPUTE.CREATED → ${r.dispute_id} synced, drafting a defence…`)}>
+                {busy === 'sim' ? <Spinner /> : <Zap />} Simulate new dispute (webhook)
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          ['Open disputes', kpis.open],
-          ['Money at risk', money(kpis.atRisk)],
-          ['Due in ≤ 3 days', kpis.urgent, kpis.urgent ? 'text-rose-600' : ''],
-          ['Avg evidence strength', `${kpis.avg}${kpis.avg !== '—' ? '/10' : ''}`],
-        ].map(([label, value, cls]) => (
-          <div key={label} className="card px-4 py-3">
-            <div className="label">{label}</div>
-            <div className={`mt-1 text-2xl font-bold ${cls || ''}`}>{value}</div>
-          </div>
-        ))}
-      </div>
+      <InViewStagger className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Open disputes" value={rows ? kpis.open : undefined} icon={FolderOpen} />
+        <StatCard label="Money at risk" value={rows ? kpis.atRisk : undefined} icon={CircleDollarSign} format={(v) => money(v)} />
+        <StatCard label="Due in ≤ 3 days" value={rows ? kpis.urgent : undefined} icon={AlarmClock} tone={kpis.urgent ? 'danger' : 'default'} emphasis={kpis.urgent > 0} />
+        <StatCard label="Avg evidence strength" value={kpis.avg ?? '—'} icon={Gauge} format={(v) => v.toFixed(1)} suffix="/10" tone="success" />
+      </InViewStagger>
 
-      <div className="card p-3">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {[['open', 'Needs response'], ['closed', 'Closed'], ['all', 'All']].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === v ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-              {l}
-            </button>
-          ))}
-          {both && (
-            <div className="ml-2 flex rounded-lg border border-slate-200 p-0.5 text-sm">
-              {[['all', 'All sources'], ['mock', 'Demo data'], ['sandbox', 'PayPal Sandbox']].map(([v, l]) => (
-                <button key={v} onClick={() => setSource(v)}
-                  className={`rounded-md px-2.5 py-1 font-medium ${source === v ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'}`}>
-                  {l}
-                </button>
-              ))}
+      <DataTableCard
+        toolbar={
+          <>
+            <Segmented label="Dispute status" value={view} onChange={setView}
+              options={[['open', 'Needs response'], ['closed', 'Closed'], ['all', 'All']]} />
+            {both && (
+              <Segmented label="Source" value={source} onChange={setSource}
+                options={[['all', 'All sources'], ['mock', 'Demo data'], ['sandbox', 'PayPal Sandbox']]} />
+            )}
+            <div className="relative ml-auto w-full sm:w-72">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+              <Input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Search buyer, item, dispute ID…"
+                aria-label="Search disputes" className="pl-9" />
             </div>
-          )}
-          <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Search buyer, item, dispute ID…"
-            className="ml-auto w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm sm:w-72" />
-        </div>
-        <div style={{ height: 520 }}>
+          </>
+        }
+      >
+        <div style={{ height: 540 }}>
           {shown ? (
             <AgGridReact
               ref={grid}
@@ -202,13 +196,14 @@ export default function Inbox() {
               rowClassRules={{ 'row-urgent': (p) => isOpen(p.data) && p.data.days_left <= 3 }}
               onRowClicked={(e) => nav(`/app/disputes/${e.data.id}`)}
               rowStyle={{ cursor: 'pointer' }}
+              rowHeight={46}
               animateRows
             />
           ) : (
-            <div className="flex h-full items-center justify-center gap-2 text-slate-500"><Spinner /> Loading disputes…</div>
+            <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status"><Spinner /> Loading disputes…</div>
           )}
         </div>
-      </div>
+      </DataTableCard>
     </div>
   )
 }

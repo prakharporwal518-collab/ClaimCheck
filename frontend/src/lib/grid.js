@@ -8,16 +8,30 @@ if (key) {
   LicenseManager.setLicenseKey(key)
 }
 
+// Every colour points at the app's CSS variables, so the grids switch with light/dark mode.
 export const gridTheme = themeQuartz.withParams({
   fontFamily: 'Inter, ui-sans-serif, system-ui',
   fontSize: 13,
+  backgroundColor: 'var(--card)',
+  foregroundColor: 'var(--foreground)',
+  textColor: 'var(--foreground)',
+  subtleTextColor: 'var(--muted-foreground)',
+  chromeBackgroundColor: 'var(--muted)',
+  headerBackgroundColor: 'var(--muted)',
+  headerTextColor: 'var(--muted-foreground)',
   headerFontWeight: 600,
-  headerBackgroundColor: '#f8fafc',
-  headerTextColor: '#475569',
-  borderColor: '#e2e8f0',
-  rowHoverColor: '#f1f5f9',
-  selectedRowBackgroundColor: '#eff6ff',
-  accentColor: '#1d4ed8',
-  wrapperBorderRadius: 12,
+  borderColor: 'var(--border)',
+  rowBorder: { color: 'var(--border)' },
+  rowHoverColor: 'var(--accent)',
+  selectedRowBackgroundColor: 'var(--accent)',
+  oddRowBackgroundColor: 'var(--card)',
+  accentColor: 'var(--primary)',
+  menuBackgroundColor: 'var(--card)',
+  inputBackgroundColor: 'var(--card)',
+  inputBorder: { color: 'var(--input)' },
+  iconColor: 'var(--muted-foreground)',
+  browserColorScheme: 'inherit',
+  wrapperBorder: false,
+  wrapperBorderRadius: 0,
   spacing: 7,
 })

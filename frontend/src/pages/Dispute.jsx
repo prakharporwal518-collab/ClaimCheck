@@ -7,6 +7,22 @@ import { daysLabel, fileSize, money, statusText } from '../lib/format'
 import { guessTag, MAX_FILES, prepareFile } from '../lib/compress'
 import { ScorePill, Spinner, StatusFlag } from '../components/ui'
 import { useApp } from '../components/AppShell'
+import {
+  AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronRight, ExternalLink, FileSpreadsheet, FileText, FlaskConical,
+  History, Info, MessageSquareQuote, PackageOpen, ScrollText, ShieldCheck, Sparkles, Trash2,
+} from 'lucide-react'
+import { motion } from 'motion/react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Alert } from '@/components/ui/alert'
+import { Checkbox, Select } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { FileUpload } from '@/components/blocks/file-upload'
+import { AnalysisLoader } from '@/components/blocks/analysis-loader'
+import { GapsCard, ReportEditor, StrengthCard } from '@/components/blocks/report-view'
+import { InView } from '@/components/motion-primitives/in-view'
+import { cn } from '@/lib/utils'
 
 const TAGS = ['Invoice', 'Tracking', 'Chat', 'Delivery photo', 'Order', 'Other']
 const PIPELINE = [
@@ -33,68 +49,68 @@ const SAMPLE_FILES = {
 // ---------------------------------------------------------------------------
 // Small pieces
 // ---------------------------------------------------------------------------
-function Section({ title, right, children, className = '' }) {
+function Section({ title, icon, right, children, className = '', contentClassName = '' }) {
+  const Icon = icon
   return (
-    <section className={`card ${className}`}>
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <h2 className="text-sm font-bold tracking-tight text-slate-800">{title}</h2>
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>{Icon && <Icon />}{title}</CardTitle>
         {right}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
+      </CardHeader>
+      <CardContent className={contentClassName}>{children}</CardContent>
+    </Card>
   )
 }
 
 function OcrCell({ data }) {
-  if (data.ocr_confidence == null) return <span className="text-slate-400">{data.mime === 'application/pdf' ? 'text layer' : '—'}</span>
+  if (data.ocr_confidence == null) return <span className="text-subtle">{data.mime === 'application/pdf' ? 'text layer' : '—'}</span>
   const low = data.ocr_confidence < 60
-  return <span className={`chip ${low ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>{data.ocr_confidence.toFixed(0)}%</span>
+  return <Badge tone={low ? 'warning' : 'neutral'} className="font-mono">{data.ocr_confidence.toFixed(0)}%</Badge>
 }
 
 function IntegrityCell({ data }) {
   const st = data.integrity?.status
-  if (!st) return <span className="text-slate-400">—</span>
+  if (!st) return <span className="text-subtle">—</span>
   const issues = data.integrity?.issues || []
   return (
-    <span title={[...(data.integrity?.ok || []), ...issues].join('\n')}
-      className={`chip ${st === 'OK' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'}`}>
-      {st === 'OK' ? '✓ OK' : '! Check'}
+    <span title={[...(data.integrity?.ok || []), ...issues].join('\n')}>
+      <Badge tone={st === 'OK' ? 'success' : 'warning'}>{st === 'OK' ? <><Check /> OK</> : <><AlertTriangle /> Check</>}</Badge>
     </span>
   )
 }
 
 function StateCell({ data }) {
   if (data.state === 'pending' || data.state === 'processing')
-    return <span className="flex items-center gap-1 text-brand-700"><Spinner className="h-3.5 w-3.5" /> Reading…</span>
-  if (data.state === 'error') return <span className="text-rose-700" title={data.error}>Error</span>
-  return <span className="text-slate-600">{data.facts.length} facts</span>
+    return <span className="flex items-center gap-1.5 text-primary-text"><Spinner className="size-3.5" /> Reading…</span>
+  if (data.state === 'error') return <span className="text-danger-fg" title={data.error}>Error</span>
+  return <span className="text-muted-foreground tabular">{data.facts.length} facts</span>
 }
 
 function ClaimDetail({ data, context }) {
   const facts = context.factsById
   return (
-    <div className="space-y-2 bg-slate-50 px-6 py-4">
-      <div className="text-sm text-slate-700"><span className="font-semibold">Why:</span> {data.why}</div>
-      {data.evidence.length === 0 && <div className="text-sm text-slate-500">No evidence cited. Upload evidence that covers this claim.</div>}
-      <ul className="space-y-1.5">
+    <div role="gridcell" className="space-y-2 bg-muted/50 px-6 py-4">
+      <div className="text-sm"><span className="font-semibold">Why:</span> <span className="text-muted-foreground">{data.why}</span></div>
+      {data.evidence.length === 0 && <div className="text-sm text-muted-foreground">No evidence cited. Upload evidence that covers this claim.</div>}
+      <div className="space-y-1.5">
         {data.evidence.map((id) => {
           const f = facts[id]
           if (!f) return null
           return (
-            <li key={id} className="flex flex-wrap items-start gap-2 text-sm">
-              <span className="chip bg-brand-100 font-mono text-brand-700">{id}</span>
-              <span className="flex-1 text-slate-800">{f.fact_display || f.fact}</span>
+            <div key={id} className="flex flex-wrap items-start gap-2 text-sm">
+              <Badge tone="info" className="font-mono">{id}</Badge>
+              <span className="flex-1">{f.fact_display || f.fact}</span>
               {f.evidence_id ? (
-                <a href={api.fileUrl(f.evidence_id)} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand-600 hover:underline">
-                  {f.source} ↗
+                <a href={api.fileUrl(f.evidence_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary-text hover:underline">
+                  {f.source} <ExternalLink className="size-3" aria-hidden="true" />
                 </a>
               ) : (
-                <span className="text-xs text-slate-500">{f.source}</span>
+                <span className="text-xs text-muted-foreground">{f.source}</span>
               )}
-            </li>
+            </div>
           )
         })}
-      </ul>
+      </div>
     </div>
   )
 }
@@ -130,10 +146,10 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
     () => [
       {
         field: 'filename', headerName: 'File', flex: 1.3, minWidth: 150,
-        cellRenderer: (p) => <a className="font-medium text-brand-700 hover:underline" href={api.fileUrl(p.data.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{p.value}</a>,
+        cellRenderer: (p) => <a className="font-medium text-primary-text hover:underline" href={api.fileUrl(p.data.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{p.value}</a>,
       },
       {
-        field: 'tag', headerName: 'Tag ✎', width: 135, editable: true,
+        field: 'tag', headerName: 'Tag (edit)', width: 135, editable: true,
         cellEditor: 'agRichSelectCellEditor', cellEditorParams: { values: TAGS },
         cellClass: 'cursor-pointer',
       },
@@ -145,8 +161,8 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
       {
         headerName: '', width: 56, sortable: false,
         cellRenderer: (p) => (
-          <button className="text-slate-400 hover:text-rose-600" title="Remove file"
-            onClick={async (e) => { e.stopPropagation(); await api.deleteEvidence(p.data.id); reload() }}>🗑</button>
+          <button className="grid size-7 place-items-center rounded-md text-subtle hover:bg-danger-bg hover:text-danger-fg" title="Remove file" aria-label={`Remove ${p.data.filename}`}
+            onClick={async (e) => { e.stopPropagation(); await api.deleteEvidence(p.data.id); reload() }}><Trash2 className="size-4" /></button>
         ),
       },
     ],
@@ -180,25 +196,26 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
     reload()
   }
 
+  const upload_ = (files) => upload(files)
+
   return (
     <Section
+      icon={PackageOpen}
       title={`Merchant evidence (${d.evidence.length}/${MAX_FILES})`}
       right={closed ? null : (
-        <div className="flex gap-2">
-          <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => csvInput.current.click()}>Import order CSV</button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => csvInput.current.click()}><FileSpreadsheet /> Import order CSV</Button>
           {d.sample_set && (
-            <button className="btn-ghost px-2.5 py-1 text-xs" disabled={busy}
-              onClick={() => loadSample()}>
-              {d.sample_set === 'starter' ? 'Import sample order CSV' : 'Load sample evidence'}
-            </button>
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => loadSample()}>
+              <FlaskConical /> {d.sample_set === 'starter' ? 'Import sample order CSV' : 'Load sample evidence'}
+            </Button>
           )}
           {!STORY_SETS.includes(d.sample_set) && (
-            <select aria-label="Load sample evidence" disabled={busy} value=""
-              className="btn-ghost cursor-pointer px-2.5 py-1 text-xs"
+            <Select aria-label="Load sample evidence" disabled={busy} value="" className="h-8 w-auto text-xs font-semibold"
               onChange={(e) => { if (e.target.value) loadSample(e.target.value) }}>
               <option value="">Load sample evidence…</option>
               {SCENARIOS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            </Select>
           )}
         </div>
       )}
@@ -208,56 +225,42 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
         e.target.value = ''
       }} />
       {closed ? (
-        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <Alert tone="neutral" icon={Info} className="mb-4">
           {d.status === 'WAITING_FOR_BUYER_RESPONSE'
             ? 'PayPal is waiting for the buyer to reply, so no new evidence can be added.'
             : `This dispute is ${statusText(d.status).toLowerCase()} on PayPal, so no new evidence can be added.`}
-        </div>
+        </Alert>
       ) : (<>
       {d.sample_set === 'starter' && d.evidence.length === 0 && (
-        <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">
+        <Alert tone="info" icon={Info} className="mb-4">
           <b>No evidence yet — on purpose.</b> This demo case shows a brand-new dispute.
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             <li>Press <b>Generate AI Defence</b> now: claims come back <b>Unverified</b> and the checklist lists exactly what to upload.</li>
             <li>Or click <b>Import sample order CSV</b> (top right): ClaimCheck finds this order in a store export and adds its tracking number.</li>
             <li>Or pick a scenario in <b>Load sample evidence…</b>: files are made for this dispute (Sofia's name, address and order).</li>
           </ul>
-        </div>
+        </Alert>
       )}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files) }}
-        onClick={() => input.current.click()}
-        className={`mb-3 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-5 text-center transition ${drag ? 'border-brand-500 bg-brand-50' : 'border-slate-300 hover:border-brand-500 hover:bg-slate-50'}`}
-      >
-        <input ref={input} type="file" multiple accept="application/pdf,image/png,image/jpeg" hidden onChange={(e) => { upload(e.target.files); e.target.value = '' }} />
-        {busy ? <Spinner className="h-5 w-5 text-brand-600" /> : <div className="text-2xl">⇪</div>}
-        <div className="mt-1 text-sm font-semibold text-slate-700">Drop tracking PDFs, invoices, chat screenshots, delivery photos</div>
-        <div className="text-xs text-slate-500">PDF, PNG or JPG · max 5 MB each · images are compressed in your browser first</div>
+      <FileUpload onFiles={upload_} busy={busy} accept="application/pdf,image/png,image/jpeg" className="mb-4"
+        title="Drop tracking PDFs, invoices, chat screenshots, delivery photos"
+        hint="PDF, PNG or JPG · max 5 MB each · images are compressed in your browser first">
         {d.sample_set === 'starter' ? (
-          <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
-            Sample order export:{' '}
-            <a href={`${api.base}/samples/orders_export.csv`} download className="font-medium text-brand-600 hover:underline">orders_export.csv</a>
-          </div>
+          <>Sample order export:{' '}
+            <a href={`${api.base}/samples/orders_export.csv`} download className="font-medium text-primary-text hover:underline">orders_export.csv</a></>
         ) : d.sample_set ? (
-          <div className="mt-2 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
-            Sample files to drag in:{' '}
+          <>Sample files to drag in:{' '}
             {SAMPLE_FILES[d.sample_set].map((f) => (
-              <a key={f} href={`${api.base}/samples/${d.sample_set}/${f}`} download className="mx-1 font-medium text-brand-600 hover:underline">{f}</a>
-            ))}
-          </div>
+              <a key={f} href={`${api.base}/samples/${d.sample_set}/${f}`} download className="mx-1 font-medium text-primary-text hover:underline">{f}</a>
+            ))}</>
         ) : (
-          <div className="mt-2 text-xs text-slate-500">
-            No files to hand? Use <b>Load sample evidence…</b> (top right): files are made to match this dispute.
-          </div>
+          <>No files to hand? Use <b>Load sample evidence…</b> (top right): files are made to match this dispute.</>
         )}
-      </div>
+      </FileUpload>
       </>)}
 
       {d.evidence.length > 0 && (
         <>
-          <div style={{ height: Math.min(56 + d.evidence.length * 42, 300) }}>
+          <div className="overflow-hidden rounded-xl border" style={{ height: Math.min(52 + d.evidence.length * 44, 310) }}>
             <AgGridReact
               theme={gridTheme}
               rowData={d.evidence}
@@ -266,6 +269,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
               defaultColDef={{ sortable: true, resizable: true }}
               singleClickEdit
               stopEditingWhenCellsLoseFocus
+              rowHeight={44}
               rowClassRules={{ 'row-linked': (p) => linkedEvidence.has(p.data.id) }}
               onRowClicked={(e) => setSelected(e.data.id)}
               onCellValueChanged={async (e) => {
@@ -278,38 +282,38 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
             />
           </div>
           {sel && (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">{sel.filename}</span>
+            <motion.div key={sel.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-xl border bg-muted/40 p-4">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <FileText className="size-3.5" aria-hidden="true" />
+                <span className="font-semibold text-foreground">{sel.filename}</span>
                 <span>· {sel.extractor || 'waiting'}</span>
-                {sel.error && <span className="text-rose-600">· {sel.error}</span>}
+                {sel.error && <span className="text-danger-fg">· {sel.error}</span>}
               </div>
               {(sel.integrity?.issues || []).map((i) => (
-                <div key={i} className="mb-1 text-xs font-medium text-amber-800">⚠ {i}</div>
+                <div key={i} className="mb-1 flex items-center gap-1.5 text-xs font-medium text-warning-fg"><AlertTriangle className="size-3.5" />{i}</div>
               ))}
               <ul className="space-y-1">
                 {sel.facts.map((f, i) => (
-                  <li key={i} className={`flex items-start gap-2 rounded px-2 py-1 text-sm ${f.needs_confirmation && !f.confirmed ? 'bg-amber-50 ring-1 ring-amber-200' : ''}`}>
-                    <span className="chip mt-0.5 bg-white font-mono text-[10px] text-slate-500 ring-1 ring-slate-200">{f.kind}</span>
-                    <span className="flex-1 text-slate-800">{f.fact}</span>
+                  <li key={i} className={cn('flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm', f.needs_confirmation && !f.confirmed && 'bg-warning-bg ring-1 ring-warning-border')}>
+                    <Badge tone="outline" className="mt-0.5 shrink-0 bg-card font-mono text-[10px] font-medium">{f.kind}</Badge>
+                    <span className="flex-1">{f.fact}</span>
                     {f.confidence != null && (
-                      <span title="OCR confidence of the line this fact was read from"
-                        className={`chip shrink-0 font-mono text-[10px] ${f.confidence < 60 ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-500 ring-1 ring-slate-200'}`}>
-                        {Math.round(f.confidence)}%
+                      <span title="OCR confidence of the line this fact was read from">
+                        <Badge tone={f.confidence < 60 ? 'warning' : 'outline'} className="shrink-0 font-mono text-[10px]">{Math.round(f.confidence)}%</Badge>
                       </span>
                     )}
                     {f.needs_confirmation && (
-                      <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-800">
-                        <input type="checkbox" checked={!!f.confirmed} onChange={(e) => updateFact(i, { confirmed: e.target.checked })} />
+                      <label className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-warning-fg">
+                        <Checkbox checked={!!f.confirmed} onChange={(e) => updateFact(i, { confirmed: e.target.checked })} />
                         {f.confirmed ? 'Confirmed' : 'Please confirm'}
                       </label>
                     )}
                   </li>
                 ))}
-                {sel.facts.length === 0 && sel.state === 'done' && <li className="text-sm text-slate-500">No facts found in this file.</li>}
+                {sel.facts.length === 0 && sel.state === 'done' && <li className="text-sm text-muted-foreground">No facts found in this file.</li>}
               </ul>
-              <p className="mt-2 text-[11px] text-slate-500">Buyer details are masked ([BUYER], [ADDRESS]…) before anything is sent to the AI model.</p>
-            </div>
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-subtle"><ShieldCheck className="size-3.5" aria-hidden="true" />Buyer details are masked ([BUYER], [ADDRESS]…) before anything is sent to the AI model.</p>
+            </motion.div>
           )}
         </>
       )}
@@ -374,17 +378,24 @@ export default function Dispute() {
       { field: 'n', headerName: '#', width: 70, cellRenderer: 'agGroupCellRenderer' },
       { field: 'claim_text', headerName: 'Buyer claim', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2' },
       { field: 'status', headerName: 'Status', width: 150, cellRenderer: (p) => <StatusFlag status={p.value} pop={justDone} /> },
-      { headerName: 'Evidence', width: 100, valueGetter: (p) => p.data.evidence.length, cellRenderer: (p) => <span className="font-mono">{p.value ? p.data.evidence.join(', ') : '—'}</span> },
+      { headerName: 'Evidence', width: 100, valueGetter: (p) => p.data.evidence.length, cellRenderer: (p) => <span className="font-mono text-muted-foreground">{p.value ? p.data.evidence.join(', ') : '—'}</span> },
       {
         field: 'strength', headerName: 'Strength', width: 105,
-        cellRenderer: (p) => p.value === 'none' || p.data.status !== 'contradicted' ? <span className="text-slate-400">—</span> : <span className={`chip ${p.value === 'strong' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'}`}>{p.value}</span>,
+        cellRenderer: (p) => p.value === 'none' || p.data.status !== 'contradicted' ? <span className="text-subtle">—</span> : <Badge tone={p.value === 'strong' ? 'solid' : 'neutral'}>{p.value}</Badge>,
       },
-      { field: 'why', headerName: 'Why', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2 text-slate-600' },
+      { field: 'why', headerName: 'Why', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2 text-muted-foreground' },
     ],
     [justDone],
   )
 
-  if (!d) return <div className="flex items-center gap-2 text-slate-500"><Spinner /> Loading dispute…</div>
+  if (!d) {
+    return (
+      <div className="space-y-5" role="status" aria-label="Loading dispute">
+        <Skeleton className="h-24 rounded-xl" />
+        <div className="grid gap-5 xl:grid-cols-12"><Skeleton className="h-72 rounded-xl xl:col-span-5" /><Skeleton className="h-72 rounded-xl xl:col-span-7" /></div>
+      </div>
+    )
+  }
 
   const open = d.status === 'WAITING_FOR_SELLER_RESPONSE'
   // Past disputes seeded for the Analytics page store only a final score, not claims or a report.
@@ -429,119 +440,137 @@ export default function Dispute() {
     }
   }
 
-  const currentStep = d.analysis_state === 'running' ? (d.evidence.some((e) => e.state !== 'done') ? 0 : 3) : -1
+  const running = working && d.analysis_state !== 'done'
+  const filesDone = !d.evidence.some((e) => ['pending', 'processing'].includes(e.state))
 
   return (
     <div className="space-y-5">
       {/* Top bar */}
-      <div className="card flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-        <Link to="/app" className="text-sm text-slate-500 hover:text-slate-800">← Inbox</Link>
-        <div>
-          <div className="font-mono text-xs text-slate-500">{d.id} · {d.source === 'sandbox' ? 'PayPal Sandbox' : 'seeded demo data'}</div>
-          <div className="text-lg font-bold">{d.buyer} <span className="font-normal text-slate-500">· {d.item}</span></div>
-        </div>
-        <div><div className="label">Amount</div><div className="font-semibold">{money(d.amount, d.currency)}</div></div>
-        <div><div className="label">Reason</div><span className="chip bg-brand-50 text-brand-700 ring-1 ring-brand-200">Item Not Received</span></div>
-        <div><div className="label">Respond within</div><div className={`font-mono font-semibold ${urgent ? 'text-rose-600' : ''}`}>{open ? daysLabel(d.days_left) : '—'}</div></div>
-        <div><div className="label">Status</div><div className="text-sm font-semibold">{statusText(d.status)}{d.decision !== 'open' && ` · ${d.decision}`}</div></div>
-        <div className="ml-auto flex items-center gap-3">
-          {a && <ScorePill label={a.strength_label} score={a.strength_score} />}
-          <button className="btn-primary px-5 py-2.5 text-base" onClick={generate} disabled={!!busy || working || !open || pendingConfirm}
-            title={pendingConfirm ? 'Confirm the amber facts first' : ''}>
-            {working && d.analysis_state !== 'done' ? <Spinner /> : '✦'} {a ? 'Re-run AI Defence' : 'Generate AI Defence'}
-          </button>
-        </div>
-      </div>
+      <InView>
+        <Card className="relative overflow-hidden">
+          <div aria-hidden="true" className="bg-pattern-dots fade-edges pointer-events-none absolute inset-0 opacity-60" />
+          <div className="relative flex flex-wrap items-center gap-x-6 gap-y-4 px-5 py-4">
+            <Button as={Link} to="/app" variant="ghost" size="sm" className="-ml-2"><ArrowLeft /> Inbox</Button>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
+                {d.id}
+                <Badge tone={d.source === 'sandbox' ? 'info' : 'neutral'}>{d.source === 'sandbox' ? 'PayPal Sandbox' : 'seeded demo data'}</Badge>
+              </div>
+              <div className="mt-0.5 truncate text-lg font-bold tracking-tight">{d.buyer} <span className="font-normal text-muted-foreground">· {d.item}</span></div>
+            </div>
+            <dl className="flex flex-wrap gap-x-6 gap-y-3">
+              <div><dt className="eyebrow">Amount</dt><dd className="font-semibold tabular">{money(d.amount, d.currency)}</dd></div>
+              <div><dt className="eyebrow">Reason</dt><dd><Badge tone="info">Item Not Received</Badge></dd></div>
+              <div><dt className="eyebrow">Respond within</dt><dd className={cn('font-mono font-semibold tabular', urgent && 'text-danger-fg')}>{open ? daysLabel(d.days_left) : '—'}</dd></div>
+              <div><dt className="eyebrow">Status</dt><dd className="text-sm font-semibold">{statusText(d.status)}{d.decision !== 'open' && ` · ${d.decision}`}</dd></div>
+            </dl>
+            <div className="flex w-full items-center gap-3 md:ml-auto md:w-auto">
+              {a && <ScorePill label={a.strength_label} score={a.strength_score} />}
+              <Button size="lg" className="flex-1 md:flex-none" onClick={generate} disabled={!!busy || working || !open || pendingConfirm}
+                title={pendingConfirm ? 'Confirm the amber facts first' : ''}>
+                {running ? <Spinner /> : <Sparkles />} {a ? 'Re-run AI Defence' : 'Generate AI Defence'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </InView>
 
       {d.source === 'sandbox' && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
+        <Alert tone="info" icon={ShieldCheck}>
           <b>Real PayPal Sandbox dispute.</b> It was read from the PayPal Disputes API.
           {open
             ? <> <b>Submit</b> and <b>Refund</b> call PayPal for real and can't be undone. The demo disputes are safe to play with.</>
             : <> Its current status comes straight from PayPal.</>}
-        </div>
+        </Alert>
       )}
 
       {pendingConfirm && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <Alert tone="warning" icon={AlertTriangle}>
           Some facts were read with low OCR confidence. Tick <b>Please confirm</b> on each amber fact (or fix the file) before running the analysis.
-        </div>
+        </Alert>
       )}
 
-      {/* Pipeline progress / timeline */}
       {history && (
-        <div className="card border-slate-300 bg-slate-50 px-5 py-4 text-sm text-slate-700">
-          <div className="font-bold text-slate-900">Past dispute (history)</div>
+        <Alert tone="neutral" icon={History}>
+          <div className="font-semibold text-foreground">Past dispute (history)</div>
           This dispute was resolved on PayPal before this demo
-          {d.outcome && <> and was <b>{d.outcome === 'won' ? 'won by the merchant' : 'lost (buyer refunded)'}</b></>}.
-          It is part of the seeded history behind the <b>Analytics</b> page, so only its final evidence-strength score
-          (<b>{a.strength_label} {a.strength_score}/10</b>) is stored, not a claim-by-claim analysis.
+          {d.outcome && <> and was <b className="text-foreground">{d.outcome === 'won' ? 'won by the merchant' : 'lost (buyer refunded)'}</b></>}.
+          It is part of the seeded history behind the <b className="text-foreground">Analytics</b> page, so only its final evidence-strength score
+          (<b className="text-foreground">{a.strength_label} {a.strength_score}/10</b>) is stored, not a claim-by-claim analysis.
           Try an open dispute in the Inbox to see ClaimCheck at work.
-        </div>
+        </Alert>
       )}
 
-      {(working || full) && (
-        <div className="card px-5 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {PIPELINE.map((name, i) => {
-              const step = a?.steps?.find((s) => s.name === name)
-              const running = working && d.analysis_state !== 'done'
-              const done = !running && step
-              const active = running && i === Math.max(currentStep, 0)
-              return (
-                <div key={name} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${active ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200' : done ? 'bg-slate-100 text-slate-700' : 'text-slate-400'}`}
-                  title={step ? `${step.detail} · ${step.engine}` : ''}>
-                  {active ? <Spinner className="h-3 w-3" /> : done ? '✓' : '○'} {name}
-                  {done && <span className="font-mono text-slate-400">{step.ms}ms</span>}
-                </div>
-              )
-            })}
-          </div>
-          {full && !working && (
-            <div className="mt-2 text-xs text-slate-500">
-              Engine: <b>{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b>Render Workflow</b> ({d.analysis_run_id})</> : (d.analysis_engine || 'in-process')} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
-              {elapsed != null && <> · <b className="text-emerald-700">defence drafted in {elapsed.toFixed(1)} s</b> (vs ~20 min by hand)</>}
+      {/* AI analysis: loading state while it runs, step summary after */}
+      {running ? (
+        <AnalysisLoader steps={PIPELINE} filesDone={filesDone} startedAt={startedAt} />
+      ) : full && (
+        <InView>
+          <Card className="px-5 py-3.5">
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-2 text-xs">
+              {PIPELINE.map((name, i) => {
+                const step = a?.steps?.find((st) => st.name === name)
+                return (
+                  <li key={name} className="flex items-center gap-1" title={step ? `${step.detail} · ${step.engine}` : ''}>
+                    <span className={cn('flex items-center gap-1.5 rounded-full px-2.5 py-1', step ? 'bg-muted text-foreground' : 'text-subtle')}>
+                      {step ? <Check className="size-3.5 text-success" aria-hidden="true" /> : <span className="size-3 rounded-full border border-current" aria-hidden="true" />}
+                      {name}
+                      {step && <span className="font-mono text-subtle tabular">{step.ms}ms</span>}
+                    </span>
+                    {i < PIPELINE.length - 1 && <ChevronRight className="size-3.5 text-subtle" aria-hidden="true" />}
+                  </li>
+                )
+              })}
+            </ol>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Engine: <b className="text-foreground">{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b className="text-foreground">Render Workflow</b> ({d.analysis_run_id})</> : (d.analysis_engine || 'in-process')} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
+              {elapsed != null && <> · <b className="text-success-fg">defence drafted in {elapsed.toFixed(1)} s</b> (vs ~20 min by hand)</>}
             </div>
-          )}
-          {d.analysis_state === 'error' && <div className="mt-2 text-sm text-rose-700">Analysis failed: {d.analysis_error}</div>}
-        </div>
+          </Card>
+        </InView>
       )}
+      {d.analysis_state === 'error' && <Alert tone="danger" icon={AlertTriangle}>Analysis failed: {d.analysis_error}</Alert>}
 
       <div className="grid gap-5 xl:grid-cols-12">
         {/* Left: customer claim */}
-        <Section title="Customer claim" className="xl:col-span-5">
-          <blockquote className="rounded-lg border-l-4 border-slate-300 bg-slate-50 px-4 py-3 text-[15px] leading-relaxed text-slate-800">
-            “{d.buyer_message}”
-            <div className="mt-2 text-xs text-slate-500">— {d.buyer}, via PayPal</div>
-          </blockquote>
-          {full ? (
-            <ol className="mt-4 space-y-2">
-              {a.results.map((r, i) => (
-                <li key={r.claim_id}>
-                  <button onClick={() => setSelectedClaim(r.claim_id === selectedClaim ? null : r.claim_id)}
-                    className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2 text-left transition ${selectedClaim === r.claim_id ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <span className="mt-0.5 font-mono text-xs text-slate-400">c{i + 1}</span>
-                    <span className="flex-1 text-sm font-medium">{r.claim_text}</span>
-                    <StatusFlag status={r.status} pop={justDone} />
-                  </button>
-                </li>
-              ))}
-            </ol>
-          ) : open ? (
-            <p className="mt-4 text-sm text-slate-500">Add evidence, then press <b>Generate AI Defence</b>. ClaimCheck splits this message into separate claims and checks each one.</p>
-          ) : null}
-        </Section>
+        <InView className="xl:col-span-5">
+          <Section title="Customer claim" icon={MessageSquareQuote} className="h-full">
+            <blockquote className="rounded-xl border-l-4 border-primary bg-muted/50 px-4 py-3 text-[15px] leading-relaxed">
+              “{d.buyer_message}”
+              <div className="mt-2 text-xs text-muted-foreground">— {d.buyer}, via PayPal</div>
+            </blockquote>
+            {full ? (
+              <ol className="mt-4 space-y-2">
+                {a.results.map((r, i) => (
+                  <motion.li key={r.claim_id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
+                    <button onClick={() => setSelectedClaim(r.claim_id === selectedClaim ? null : r.claim_id)}
+                      aria-pressed={selectedClaim === r.claim_id}
+                      className={cn('flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                        selectedClaim === r.claim_id ? 'border-primary bg-accent' : 'hover:bg-muted')}>
+                      <span className="mt-0.5 font-mono text-xs text-subtle">c{i + 1}</span>
+                      <span className="flex-1 text-sm font-medium">{r.claim_text}</span>
+                      <StatusFlag status={r.status} pop={justDone} />
+                    </button>
+                  </motion.li>
+                ))}
+              </ol>
+            ) : open ? (
+              <p className="mt-4 text-sm text-muted-foreground">Add evidence, then press <b className="text-foreground">Generate AI Defence</b>. ClaimCheck splits this message into separate claims and checks each one.</p>
+            ) : null}
+          </Section>
+        </InView>
 
         {/* Right: evidence */}
-        <div className="xl:col-span-7">
+        <InView className="xl:col-span-7" delay={0.08}>
           <EvidencePanel d={d} linkedEvidence={linkedEvidence} reload={reload} notify={notify} />
-        </div>
+        </InView>
       </div>
 
       {/* Middle: claim vs evidence */}
       {full && (
-        <Section title="Claim vs evidence" right={<span className="text-xs text-slate-500">Expand a row to see the cited facts · click to highlight the files</span>}>
-          <div>
+        <InView>
+          <Section title="Claim vs evidence" icon={ShieldCheck} contentClassName="p-0"
+            right={<span className="text-xs text-muted-foreground">Expand a row to see the cited facts · click to highlight the files</span>}>
             <AgGridReact
               domLayout="autoHeight"
               theme={gridTheme}
@@ -557,114 +586,52 @@ export default function Dispute() {
               onRowClicked={(e) => setSelectedClaim(e.data.claim_id)}
               onFirstDataRendered={(e) => e.api.forEachNode((n) => n.data.status === 'contradicted' && n.data.n === 1 && n.setExpanded(true))}
             />
-          </div>
-        </Section>
+          </Section>
+        </InView>
       )}
 
-      {/* Bottom: gaps, strength, report */}
+      {/* Bottom: strength, gaps, report */}
       {full && (
         <div className="grid gap-5 xl:grid-cols-12">
-          <div className="space-y-5 xl:col-span-5">
-            <Section title="Evidence strength">
-              <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${a.strength_label === 'High' ? 'bg-emerald-50 text-emerald-900' : a.strength_label === 'Medium' ? 'bg-amber-50 text-amber-900' : 'bg-rose-50 text-rose-900'}`}>
-                {a.strength_line}
-              </div>
-              <button className="mt-2 text-xs font-semibold text-brand-600 hover:underline" onClick={() => setShowBreakdown(!showBreakdown)}>
-                {showBreakdown ? 'Hide' : 'Show'} how the score was earned
-              </button>
-              {showBreakdown && (
-                <table className="mt-2 w-full text-sm">
-                  <tbody>
-                    {a.score_breakdown.map((b, i) => (
-                      <tr key={i} className="border-t border-slate-100">
-                        <td className={`w-12 py-1.5 font-mono font-semibold ${b.points > 0 ? 'text-emerald-700' : b.points < 0 ? 'text-rose-700' : ''}`}>{b.points > 0 ? `+${b.points}` : b.points}</td>
-                        <td className="py-1.5 text-slate-700">{b.label}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t border-slate-300 font-semibold"><td className="py-1.5 font-mono">{a.strength_score}</td><td>Final score (0–10). High 7–10, Medium 4–6, Low 0–3.</td></tr>
-                  </tbody>
-                </table>
-              )}
-              {rec && (
-                <div className={`mt-4 rounded-lg border px-4 py-3 ${rec.action === 'refund' ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'}`}>
-                  <div className="text-sm font-bold">{rec.title}</div>
-                  <div className="text-sm text-slate-700">{rec.why}</div>
-                </div>
-              )}
-              <p className="mt-3 text-[11px] text-slate-500">Evidence strength is a transparent heuristic, not a promise: PayPal decides the outcome. ClaimCheck checks consistency, not authenticity.</p>
-            </Section>
-
-            <Section title="Evidence gaps">
-              <ul className="space-y-1.5">
-                {a.gaps.map((g) => (
-                  <li key={g.id} className="flex items-center gap-2 text-sm">
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${g.missing ? (g.critical ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') : 'bg-emerald-100 text-emerald-700'}`}>
-                      {g.missing ? '✕' : '✓'}
-                    </span>
-                    <span className={g.missing ? 'text-slate-800' : 'text-slate-500'}>{g.label}</span>
-                    {g.missing && g.critical && <span className="chip bg-rose-100 text-rose-700">critical</span>}
-                  </li>
-                ))}
-              </ul>
-              {a.integrity?.checks?.length > 0 && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <div className="label mb-1">Integrity checks</div>
-                  {a.integrity.checks.map((c, i) => (
-                    <div key={i} className={`text-sm ${c.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{c.ok ? '✓' : '⚠'} {c.text}</div>
-                  ))}
-                </div>
-              )}
-            </Section>
-          </div>
-
-          <Section title="Defence report" className="xl:col-span-7"
-            right={<span className="text-xs text-slate-500">{saved ? 'Saved' : 'Unsaved changes'} · AI draft kept in the audit log</span>}>
-            <textarea
+          <InView className="space-y-5 xl:col-span-5">
+            <StrengthCard analysis={a} />
+            <GapsCard analysis={a} />
+          </InView>
+          <InView className="xl:col-span-7" delay={0.08}>
+            <ReportEditor
               value={report}
               onChange={(e) => { setReport(e.target.value); setSaved(false); setApproved(false) }}
               onBlur={async () => { if (!saved) { await api.saveReport(d.id, report); setSaved(true) } }}
-              className="h-80 w-full resize-y rounded-lg border border-slate-300 p-3 font-mono text-[13px] leading-relaxed focus:border-brand-500 focus:outline-none"
-              disabled={!open}
+              saved={saved}
+              open={open}
+              approved={approved}
+              onApprove={setApproved}
+              busy={busy}
+              refundRecommended={rec?.action === 'refund'}
+              statusLabel={statusText(d.status).toLowerCase()}
+              pdfUrl={api.pdfUrl(d.id)}
+              onSubmit={() => { const k = sandboxKey(); if (k !== null) act('submit', () => api.submit(d.id, report, k), (r) => `Evidence submitted via provide-evidence (${r.mode === 'mock' ? 'seeded mock' : 'PayPal Sandbox'})`) }}
+              onRefund={() => { if (!confirm('Accept the claim and refund the buyer through PayPal?')) return; const k = sandboxKey(); if (k !== null) act('refund', () => api.acceptClaim(d.id, '', k), (r) => `Claim accepted, buyer refunded (accept-claim, ${r.mode})`) }}
             />
-            <div className="mt-1 text-right text-xs text-slate-500">{report.length} / 2000 characters (PayPal notes limit)</div>
-            {open ? (
-              <>
-                <label className="mt-3 flex items-start gap-2 text-sm">
-                  <input type="checkbox" className="mt-1" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
-                  <span>I have read this report and the evidence. Send it to PayPal on my behalf.</span>
-                </label>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn-primary" disabled={!approved || !!busy || report.length > 2000}
-                    onClick={() => { const k = sandboxKey(); if (k !== null) act('submit', () => api.submit(d.id, report, k), (r) => `Evidence submitted via provide-evidence (${r.mode === 'mock' ? 'seeded mock' : 'PayPal Sandbox'})`) }}>
-                    {busy === 'submit' ? <Spinner /> : '➤'} Submit to PayPal
-                  </button>
-                  <a className="btn-ghost" href={api.pdfUrl(d.id)}>⇩ Export PDF</a>
-                  <button className={rec?.action === 'refund' ? 'btn-danger' : 'btn-ghost'} disabled={!!busy}
-                    onClick={() => { if (!confirm('Accept the claim and refund the buyer through PayPal?')) return; const k = sandboxKey(); if (k !== null) act('refund', () => api.acceptClaim(d.id, '', k), (r) => `Claim accepted, buyer refunded (accept-claim, ${r.mode})`) }}>
-                    {busy === 'refund' ? <Spinner /> : '↺'} {rec?.action === 'refund' ? 'Refund buyer (recommended)' : 'Accept claim & refund'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="mt-3 flex gap-2">
-                <span className="chip bg-slate-100 text-slate-700">This dispute is {statusText(d.status).toLowerCase()}.</span>
-                <a className="btn-ghost" href={api.pdfUrl(d.id)}>⇩ Export PDF</a>
-              </div>
-            )}
-            <p className="mt-3 text-[11px] text-slate-500">ClaimCheck drafts; you decide. Nothing is sent until you approve. This is not legal advice.</p>
-          </Section>
+          </InView>
         </div>
       )}
 
       {/* Audit log */}
-      <details className="card px-5 py-3">
-        <summary className="cursor-pointer text-sm font-bold text-slate-800">Audit log ({d.audit.length})</summary>
-        <ul className="mt-2 space-y-1 font-mono text-xs text-slate-600">
-          {d.audit.slice().reverse().map((l, i) => (
-            <li key={i}><span className="text-slate-400">{new Date(l.at).toLocaleString()}</span> {l.action} {Object.entries(l.detail).filter(([k]) => !['ai_draft', 'final', 'request', 'response'].includes(k)).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ')}</li>
-          ))}
-        </ul>
-      </details>
+      <Card>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-semibold">
+            <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
+            <ScrollText className="size-4 text-muted-foreground" aria-hidden="true" />
+            Audit log ({d.audit.length})
+          </summary>
+          <ul className="space-y-1 border-t px-5 py-3 font-mono text-xs text-muted-foreground">
+            {d.audit.slice().reverse().map((l, i) => (
+              <li key={i} className="break-words"><span className="text-subtle">{new Date(l.at).toLocaleString()}</span> <span className="text-foreground">{l.action}</span> {Object.entries(l.detail).filter(([k]) => !['ai_draft', 'final', 'request', 'response'].includes(k)).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ')}</li>
+            ))}
+          </ul>
+        </details>
+      </Card>
     </div>
   )
 }
