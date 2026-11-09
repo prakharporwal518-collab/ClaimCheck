@@ -335,8 +335,14 @@ export default function Dispute() {
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [startedAt, setStartedAt] = useState(null)
   const [elapsed, setElapsed] = useState(null)
-  const [justDone, setJustDone] = useState(false)
+  // Which finished run the "Contradicted" flags are popping for (0 = not popping). A new number
+  // per run means every fresh result replays the pop, even one that lands within 3 s of the last.
+  const [popRun, setPopRun] = useState(0)
+  const runs = useRef(0)
+  const popTimer = useRef(null)
+  useEffect(() => () => clearTimeout(popTimer.current), [])
   const prevState = useRef(null)
+  const prevAnalysisId = useRef(null)
 
   const reload = useCallback(() => api.dispute(id).then(setD).catch((e) => notify(e.message, 'error')), [id, notify])
   useEffect(() => { reload() }, [reload])
@@ -354,14 +360,23 @@ export default function Dispute() {
     if (d?.analysis) { setReport(d.analysis.report_final || d.analysis.report_text); setSaved(true) }
   }, [analysisId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // An analysis the merchant started has just finished: either we saw it go from running to
+  // done, or it was so quick (rules engine, ~0.1 s) that the next load already shows a new
+  // finished analysis (a re-run goes from one "done" straight to another, with a new id).
   useEffect(() => {
     if (!d) return
-    if (prevState.current && prevState.current !== 'done' && d.analysis_state === 'done' && startedAt) {
+    const analysisId_ = d.analysis?.id ?? null
+    const loadedBefore = prevState.current !== null
+    const newResult = d.analysis_state === 'done' && (prevState.current !== 'done' || analysisId_ !== prevAnalysisId.current)
+    if (loadedBefore && startedAt && newResult) {
       setElapsed((Date.now() - startedAt) / 1000)
-      setJustDone(true)
-      setTimeout(() => setJustDone(false), 3000)
+      runs.current += 1
+      setPopRun(runs.current)
+      clearTimeout(popTimer.current)
+      popTimer.current = setTimeout(() => setPopRun(0), 3000)
     }
     prevState.current = d.analysis_state
+    prevAnalysisId.current = analysisId_
   }, [d, startedAt])
 
   const a = d?.analysis
@@ -376,7 +391,7 @@ export default function Dispute() {
     () => [
       { field: 'n', headerName: '#', width: 70, cellRenderer: 'agGroupCellRenderer' },
       { field: 'claim_text', headerName: 'Buyer claim', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2' },
-      { field: 'status', headerName: 'Status', width: 150, cellRenderer: (p) => <StatusFlag status={p.value} pop={justDone} delay={(p.node.rowIndex ?? 0) * 0.12} /> },
+      { field: 'status', headerName: 'Status', width: 150, cellRenderer: (p) => <StatusFlag status={p.value} pop={popRun} delay={(p.node.rowIndex ?? 0) * 0.12} /> },
       { headerName: 'Evidence', width: 100, valueGetter: (p) => p.data.evidence.length, cellRenderer: (p) => <span className="font-mono text-muted-foreground">{p.value ? p.data.evidence.join(', ') : '—'}</span> },
       {
         field: 'strength', headerName: 'Strength', width: 105,
@@ -384,7 +399,7 @@ export default function Dispute() {
       },
       { field: 'why', headerName: 'Why', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2 text-muted-foreground' },
     ],
-    [justDone],
+    [popRun],
   )
 
   if (!d) {
@@ -550,7 +565,7 @@ export default function Dispute() {
                       <span className="mt-0.5 font-mono text-xs text-subtle">c{i + 1}</span>
                       <span className="flex-1 text-sm font-medium">{r.claim_text}</span>
                       {/* pops once its row has slid in, one row after another */}
-                      <StatusFlag status={r.status} pop={justDone} delay={0.35 + i * 0.12} />
+                      <StatusFlag status={r.status} pop={popRun} delay={0.35 + i * 0.12} />
                     </button>
                   </li>
                 ))}

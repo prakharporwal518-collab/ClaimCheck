@@ -39,13 +39,14 @@ const FLAG = {
 }
 
 /**
- * A claim's verdict badge. With `pop` (set for a few seconds after an analysis finishes), a
- * "Contradicted" badge bounces, its dot throbs and a ring pulses out twice. `delay` lets a list
- * of flags pop one after another. Nothing animates when the viewer prefers reduced motion.
+ * A claim's verdict badge. With `pop` set (for a few seconds after an analysis finishes), a
+ * "Contradicted" badge bounces, its dot throbs and a ring pulses out twice. `pop` can be a run
+ * number: each new value replays the pop. `delay` lets a list of flags pop one after another.
+ * Nothing animates when the viewer prefers reduced motion.
  */
 export function StatusFlag({ status, pop = false, delay = 0 }) {
   const f = FLAG[status] || FLAG.unverified
-  const popping = pop && status === 'contradicted'
+  const popping = Boolean(pop) && status === 'contradicted'
   const badge = useRef(null)
 
   useMotionGSAP(() => {
@@ -57,7 +58,7 @@ export function StatusFlag({ status, pop = false, delay = 0 }) {
       // Grow the ring's edges outward by the same distance on every side (scaling a wide pill
       // would spread it far more sideways than up and down, and thicken the border).
       .fromTo(q('[data-flag="ring"]'), { inset: 0, autoAlpha: 0.75 }, { inset: -9, autoAlpha: 0, duration: 0.9, ease: 'power2.out', repeat: 1 }, 0)
-  }, { scope: badge, dependencies: [popping] })
+  }, { scope: badge, dependencies: [popping ? pop : false] })
 
   return (
     <Badge ref={badge} tone={f.tone} className="relative">
