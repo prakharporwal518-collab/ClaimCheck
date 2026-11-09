@@ -1,7 +1,8 @@
 // Small shared pieces used across pages (kept at this path so existing imports keep working).
-import { motion, AnimatePresence } from 'motion/react'
+import { useRef, useState } from 'react'
 import { CheckCircle2, CircleAlert, Info, Loader2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { gsap, useGSAP } from '@/lib/gsap'
 import { cn } from '@/lib/utils'
 
 export function Logo({ className = 'h-7 w-7' }) {
@@ -57,23 +58,47 @@ const TOAST = {
   info: { icon: Info, cls: 'border-border bg-card text-foreground [&_.ti]:text-primary-text' },
 }
 
-export function Toast({ toast, onClose }) {
-  const t = toast && (TOAST[toast.kind] || TOAST.info)
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Toast with GSAP enter and exit. When `toast` becomes null the last message stays on screen
+ * while it animates out, then unmounts. A thin bar counts down the `duration` before auto-close.
+ */
+export function Toast({ toast, onClose, duration = 5000 }) {
+  const [shown, setShown] = useState(toast)
+  if (toast && toast !== shown) setShown(toast) // a new message replaces the old one straight away
+  const box = useRef(null)
+  const t = shown && (TOAST[shown.kind] || TOAST.info)
+
+  useGSAP(() => {
+    const el = box.current
+    if (!el) return
+    const q = gsap.utils.selector(el)
+    const instant = reducedMotion()
+    if (toast) {
+      // overwrite stops a still-running exit, so its onComplete can't hide this new message
+      gsap.timeline()
+        .fromTo(el, { autoAlpha: 0, y: 16, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: instant ? 0 : 0.4, ease: 'back.out(1.6)', overwrite: true })
+        .fromTo(q('.ti'), { scale: 0.3, rotation: -45 }, { scale: 1, rotation: 0, duration: instant ? 0 : 0.45, ease: 'back.out(3)' }, '<0.1')
+      if (!instant) gsap.fromTo(q('[data-toast="timer"]'), { scaleX: 1 }, { scaleX: 0, duration: duration / 1000, ease: 'none' })
+    } else {
+      gsap.to(el, { autoAlpha: 0, y: 8, scale: 0.98, duration: instant ? 0 : 0.25, ease: 'power2.in', overwrite: true, onComplete: () => setShown(null) })
+    }
+  }, { scope: box, dependencies: [toast] })
+
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-end sm:inset-x-auto sm:right-5">
-      <AnimatePresence>
-        {toast && (
-          <motion.div key={toast.text} role="status" aria-live="polite"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }}
-            className={cn('pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-pop', t.cls)}>
-            <t.icon className="ti mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="flex-1 leading-relaxed">{toast.text}</span>
-            <button onClick={onClose} className="rounded text-muted-foreground hover:text-foreground" aria-label="Dismiss">
-              <X className="size-4" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {shown && (
+        <div ref={box} role="status" aria-live="polite"
+          className={cn('pointer-events-auto relative flex w-full max-w-md items-start gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm shadow-pop', t.cls)}>
+          <t.icon className="ti mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 leading-relaxed">{shown.text}</span>
+          <button onClick={onClose} className="rounded text-muted-foreground hover:text-foreground" aria-label="Dismiss">
+            <X className="size-4" />
+          </button>
+          <span data-toast="timer" aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current opacity-20" />
+        </div>
+      )}
     </div>
   )
 }

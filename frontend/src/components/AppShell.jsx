@@ -7,6 +7,8 @@ import { Toast } from './ui'
 import { Navbar } from './blocks/navbar'
 import { Badge } from './ui/badge'
 
+const TOAST_MS = 5000 // how long a toast stays up
+
 const AppCtx = createContext(null)
 export const useApp = () => useContext(AppCtx)
 
@@ -34,7 +36,7 @@ export default function AppShell() {
   }, [])
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 5000)
+    const t = setTimeout(() => setToast(null), TOAST_MS)
     return () => clearTimeout(t)
   }, [toast])
 
@@ -80,7 +82,7 @@ export default function AppShell() {
           ClaimCheck drafts; you decide. Nothing is sent to PayPal until you approve it. Not legal advice.
         </footer>
       </div>
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} duration={TOAST_MS} />
     </AppCtx.Provider>
   )
 }
