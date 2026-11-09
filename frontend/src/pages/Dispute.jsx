@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { AgGridReact } from 'ag-grid-react'
 import { api } from '../lib/api'
 import { gridTheme } from '../lib/grid'
+import { useGridMotion } from '../lib/grid-motion'
 import { daysLabel, fileSize, money, statusText } from '../lib/format'
 import { guessTag, MAX_FILES, prepareFile } from '../lib/compress'
 import { ScorePill, Spinner, StatusFlag } from '../components/ui'
@@ -118,6 +119,7 @@ function ClaimDetail({ data, context }) {
 // Evidence upload + grid + facts
 // ---------------------------------------------------------------------------
 function EvidencePanel({ d, linkedEvidence, reload, notify }) {
+  const evidenceMotion = useGridMotion() // newly uploaded files fade in with a highlight
   const [drag, setDrag] = useState(false)
   const [busy, setBusy] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -259,12 +261,13 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
 
       {d.evidence.length > 0 && (
         <>
-          <div className="overflow-hidden rounded-xl border" style={{ height: Math.min(52 + d.evidence.length * 44, 310) }}>
+          <div ref={evidenceMotion.ref} className="overflow-hidden rounded-xl border" style={{ height: Math.min(52 + d.evidence.length * 44, 310) }}>
             <AgGridReact
               theme={gridTheme}
               rowData={d.evidence}
               columnDefs={columns}
               getRowId={(p) => String(p.data.id)}
+              {...evidenceMotion.gridProps}
               defaultColDef={{ sortable: true, resizable: true }}
               singleClickEdit
               stopEditingWhenCellsLoseFocus
@@ -380,6 +383,8 @@ export default function Dispute() {
   }, [d, startedAt])
 
   const a = d?.analysis
+  // Claim rows replay their entrance for each new analysis; expanded rows fade their detail in.
+  const claimMotion = useGridMotion(a?.id)
   const factsById = useMemo(() => Object.fromEntries((a?.facts || []).map((f) => [f.id, f])), [a])
   const claimRows = useMemo(() => (a?.results || []).map((r, i) => ({ ...r, n: i + 1 })), [a])
   const linkedEvidence = useMemo(() => {
@@ -587,6 +592,7 @@ export default function Dispute() {
         <InView>
           <Section title="Claim vs evidence" icon={ShieldCheck} contentClassName="p-0"
             right={<span className="text-xs text-muted-foreground">Expand a row to see the cited facts · click to highlight the files</span>}>
+            <div ref={claimMotion.ref}>
             <AgGridReact
               domLayout="autoHeight"
               theme={gridTheme}
@@ -600,8 +606,13 @@ export default function Dispute() {
               defaultColDef={{ resizable: true, sortable: false }}
               rowClassRules={{ 'row-linked': (p) => p.data.claim_id === selectedClaim }}
               onRowClicked={(e) => setSelectedClaim(e.data.claim_id)}
-              onFirstDataRendered={(e) => e.api.forEachNode((n) => n.data.status === 'contradicted' && n.data.n === 1 && n.setExpanded(true))}
+              {...claimMotion.gridProps}
+              onFirstDataRendered={(e) => {
+                claimMotion.gridProps.onFirstDataRendered(e)
+                e.api.forEachNode((n) => n.data.status === 'contradicted' && n.data.n === 1 && n.setExpanded(true))
+              }}
             />
+            </div>
           </Section>
         </InView>
       )}
