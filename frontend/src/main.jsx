@@ -1,7 +1,6 @@
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { MotionConfig } from 'motion/react'
 import './index.css'
 import AppShell from './components/AppShell'
 import Landing from './pages/Landing'
@@ -37,9 +36,7 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {/* Respect the viewer's "reduce motion" setting everywhere */}
-    <MotionConfig reducedMotion="user">
-      <RouterProvider router={router} />
-    </MotionConfig>
+    {/* Animations use GSAP; each one checks the viewer's "reduce motion" setting (lib/gsap.js). */}
+    <RouterProvider router={router} />
   </StrictMode>,
 )
