@@ -5,7 +5,7 @@
 // hidden with an `ag-hidden` class. A MutationObserver spots them; its callback runs before the
 // browser paints, so a widget is hidden before you could see it pop in unanimated.
 //
-// - Dashboard load (and whenever AG Studio rebuilds it): widgets fade up and settle into
+// - Dashboard load (and whenever AG Studio rebuilds it, e.g. after a theme switch): widgets fade up and settle into
 //   place, top-left to bottom-right, once the charts have finished drawing.
 // - Widgets added later (Edit mode or the AI assistant): a short pop.
 // - A side panel that becomes visible slides in from its own side (View <-> Edit, AI panel).

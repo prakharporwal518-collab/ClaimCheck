@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 const KEY = 'claimcheck-theme'
 
@@ -12,28 +12,42 @@ function read() {
 
 const system = () => (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 
-/** Light/dark theme: the viewer's saved choice, else the system setting. */
+// One shared theme for the whole app. Every useTheme() reads this store, so the navbar toggle,
+// the Settings page and the Analytics dashboard always agree. (Each call used to keep its own
+// copy, so the dashboard kept its old colours after you switched theme from the navbar.)
+// index.html sets the <html> class before first paint, so start from that.
+let current = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+const listeners = new Set()
+
+function apply(theme) {
+  if (theme === current) return
+  current = theme
+  document.documentElement.classList.toggle('dark', theme === 'dark')
+  listeners.forEach((notify) => notify())
+}
+
+const subscribe = (notify) => {
+  listeners.add(notify)
+  return () => listeners.delete(notify)
+}
+const getSnapshot = () => current
+
+// Follow the system setting until the viewer picks one, and follow a choice made in another tab.
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!read()) apply(system()) })
+window.addEventListener('storage', (e) => { if (e.key === KEY) apply(read() || system()) })
+
+/** Light/dark theme: the viewer's saved choice, else the system setting. Shared app-wide. */
 export function useTheme() {
-  const [theme, setThemeState] = useState(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }, [theme])
-
-  // Follow the system setting until the viewer picks one.
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => { if (!read()) setThemeState(system()) }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
+  const theme = useSyncExternalStore(subscribe, getSnapshot)
 
   const setTheme = useCallback((t) => {
     try { localStorage.setItem(KEY, t) } catch { /* storage blocked */ }
-    setThemeState(t)
+    apply(t)
   }, [])
 
-  return { theme, setTheme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark') }
+  const toggle = useCallback(() => setTheme(current === 'dark' ? 'light' : 'dark'), [setTheme])
+
+  return { theme, setTheme, toggle }
 }
 
 /** Resolved colour of a CSS variable, for canvas-drawn widgets (AG Studio charts). */
