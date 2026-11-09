@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react'
 import { CheckCircle2, CircleAlert, Info, Loader2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { gsap, useGSAP } from '@/lib/gsap'
+import { gsap, useGSAP, useMotionGSAP } from '@/lib/gsap'
 import { cn } from '@/lib/utils'
 
 export function Logo({ className = 'h-7 w-7' }) {
@@ -38,11 +38,34 @@ const FLAG = {
   unverified: { tone: 'neutral', text: 'Unverified', dot: 'border-2 border-subtle bg-transparent' },
 }
 
-export function StatusFlag({ status, pop = false }) {
+/**
+ * A claim's verdict badge. With `pop` (set for a few seconds after an analysis finishes), a
+ * "Contradicted" badge bounces, its dot throbs and a ring pulses out twice. `delay` lets a list
+ * of flags pop one after another. Nothing animates when the viewer prefers reduced motion.
+ */
+export function StatusFlag({ status, pop = false, delay = 0 }) {
   const f = FLAG[status] || FLAG.unverified
+  const popping = pop && status === 'contradicted'
+  const badge = useRef(null)
+
+  useMotionGSAP(() => {
+    if (!popping) return
+    const q = gsap.utils.selector(badge)
+    gsap.timeline({ delay })
+      .to(badge.current, { keyframes: { scale: [1, 1.18, 0.96, 1] }, duration: 0.5, ease: 'power2.out' })
+      .fromTo(q('[data-flag="dot"]'), { scale: 1 }, { keyframes: { scale: [1, 1.9, 1] }, duration: 0.5, ease: 'power2.out', repeat: 1, repeatDelay: 0.4 }, 0)
+      // Grow the ring's edges outward by the same distance on every side (scaling a wide pill
+      // would spread it far more sideways than up and down, and thicken the border).
+      .fromTo(q('[data-flag="ring"]'), { inset: 0, autoAlpha: 0.75 }, { inset: -9, autoAlpha: 0, duration: 0.9, ease: 'power2.out', repeat: 1 }, 0)
+  }, { scope: badge, dependencies: [popping] })
+
   return (
-    <Badge tone={f.tone} className={cn(pop && status === 'contradicted' && 'flag-pop')}>
-      <span className={cn('inline-block size-2 rounded-full', f.dot)} aria-hidden="true" />
+    <Badge ref={badge} tone={f.tone} className="relative">
+      {popping && (
+        <span data-flag="ring" aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-full border-2 border-danger opacity-0" />
+      )}
+      <span data-flag="dot" className={cn('inline-block size-2 rounded-full', f.dot)} aria-hidden="true" />
       {f.text}
     </Badge>
   )

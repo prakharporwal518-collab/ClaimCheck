@@ -196,9 +196,6 @@ header[data-scrolled] { box-shadow: var(--shadow-pop); }
 .ag-row.row-urgent .ag-cell { color: var(--danger-fg); }
 .ag-row.row-linked { background-color: var(--accent) !important; }
 
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent) } 100% { box-shadow: 0 0 0 10px transparent } }
-.flag-pop { animation: pulse-ring 1.2s ease-out 2; }
-
 /* Let grid columns shrink on phones (AG Grid scrolls inside its own box). */
 .grid > * { min-width: 0; }
 
