@@ -376,7 +376,7 @@ export default function Dispute() {
     () => [
       { field: 'n', headerName: '#', width: 70, cellRenderer: 'agGroupCellRenderer' },
       { field: 'claim_text', headerName: 'Buyer claim', flex: 2, minWidth: 220, wrapText: true, autoHeight: true, cellClass: 'leading-snug py-2' },
-      { field: 'status', headerName: 'Status', width: 150, cellRenderer: (p) => <StatusFlag status={p.value} pop={justDone} /> },
+      { field: 'status', headerName: 'Status', width: 150, cellRenderer: (p) => <StatusFlag status={p.value} pop={justDone} delay={(p.node.rowIndex ?? 0) * 0.12} /> },
       { headerName: 'Evidence', width: 100, valueGetter: (p) => p.data.evidence.length, cellRenderer: (p) => <span className="font-mono text-muted-foreground">{p.value ? p.data.evidence.join(', ') : '—'}</span> },
       {
         field: 'strength', headerName: 'Strength', width: 105,
@@ -549,7 +549,8 @@ export default function Dispute() {
                         selectedClaim === r.claim_id ? 'border-primary bg-accent' : 'hover:bg-muted')}>
                       <span className="mt-0.5 font-mono text-xs text-subtle">c{i + 1}</span>
                       <span className="flex-1 text-sm font-medium">{r.claim_text}</span>
-                      <StatusFlag status={r.status} pop={justDone} />
+                      {/* pops once its row has slid in, one row after another */}
+                      <StatusFlag status={r.status} pop={justDone} delay={0.35 + i * 0.12} />
                     </button>
                   </li>
                 ))}
