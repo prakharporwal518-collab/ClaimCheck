@@ -183,6 +183,9 @@
 .bg-pattern-dots { --pat: url(/bg/dots.svg); --pat-size: 22px 22px; }
 .fade-edges { --fade: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
 .fade-bottom { --fade: linear-gradient(to bottom, #000 20%, transparent); }
+/* Navbar gets a soft shadow once the page scrolls (set by GSAP ScrollTrigger in navbar.jsx). */
+header[data-scrolled] { box-shadow: var(--shadow-pop); }
+
 .bg-glow { background: url(/bg/glow.svg) center top / cover no-repeat; opacity: var(--glow-opacity); }
 .bg-waves { -webkit-mask: url(/bg/waves.svg) center bottom / 100% 100% no-repeat; mask: url(/bg/waves.svg) center bottom / 100% 100% no-repeat; }
 
