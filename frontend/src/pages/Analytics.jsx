@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { money } from '../lib/format'
 import { Spinner } from '../components/ui'
 import { buildReport } from '../lib/studioReport'
+import { useStudioMotion } from '../lib/studio-motion'
 import { BarChart3, CircleDollarSign, FolderOpen, Timer, Trophy } from 'lucide-react'
 import { PageHeader } from '@/components/blocks/page-header'
 import { StatCard } from '@/components/blocks/stat-card'
@@ -71,6 +72,8 @@ const PROMPTS = [
 export default function Analytics() {
   const [rows, setRows] = useState(null)
   const [mode, setMode] = useState('view')
+  // Dashboard widgets fade up on load; side panels slide in when you switch mode.
+  const studioMotion = useStudioMotion(mode)
   const [health, setHealth] = useState(null)
   useEffect(() => {
     api.analytics().then((r) => setRows(r.rows))
@@ -127,6 +130,7 @@ export default function Analytics() {
       </InViewStagger>
 
       <Card className="overflow-hidden" style={{ height: 900 }}>
+        <div ref={studioMotion} className="h-full">
         {data ? (
           <AgStudio
             key={theme}
@@ -144,6 +148,7 @@ export default function Analytics() {
         ) : (
           <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status"><Spinner /> Loading data…</div>
         )}
+        </div>
       </Card>
     </div>
   )

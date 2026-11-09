@@ -6,6 +6,12 @@ import { useGSAP } from '@gsap/react'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText)
 
+// AG Grid and AG Studio can block the main thread for 100-350 ms while they render. By default
+// GSAP catches up after any stall shorter than 500 ms, so an animation started just before one
+// would be nearly finished by the first frame anyone sees. Counting a stall over 100 ms as one
+// 33 ms frame makes animations pause briefly instead of skipping ahead.
+gsap.ticker.lagSmoothing(100, 33)
+
 export const MOTION_OK = '(prefers-reduced-motion: no-preference)'
 
 /**
