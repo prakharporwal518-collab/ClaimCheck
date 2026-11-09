@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { gridTheme } from '../lib/grid'
+import { useGridMotion } from '../lib/grid-motion'
 import { daysLabel, money, statusText } from '../lib/format'
 import { ScorePill, Spinner } from '../components/ui'
 import { useApp } from '../components/AppShell'
@@ -55,6 +56,8 @@ export default function Inbox() {
   const [quick, setQuick] = useState('')
   const [view, setView] = useState('open')
   const [source, setSource] = useState('all')
+  // Rows fade up on load and when you switch filters; new disputes also get a highlight.
+  const gridMotion = useGridMotion(`${view}|${source}`)
   const both = health?.paypal_sources?.length > 1
   const [busy, setBusy] = useState('')
 
@@ -183,7 +186,7 @@ export default function Inbox() {
           </>
         }
       >
-        <div style={{ height: 540 }}>
+        <div ref={gridMotion.ref} style={{ height: 540 }}>
           {shown ? (
             <AgGridReact
               ref={grid}
@@ -198,6 +201,7 @@ export default function Inbox() {
               rowStyle={{ cursor: 'pointer' }}
               rowHeight={46}
               animateRows
+              {...gridMotion.gridProps}
             />
           ) : (
             <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status"><Spinner /> Loading disputes…</div>
