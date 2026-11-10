@@ -9,6 +9,10 @@ os.environ["CLAIMCHECK_DATA_DIR"] = _tmp
 os.environ["PAYPAL_MODE"] = "mock"
 os.environ.pop("GEMINI_API_KEY", None)
 os.environ.pop("USE_RENDER_WORKFLOWS", None)
+os.environ.pop("SANDBOX_ACTIONS_KEY", None)
+# The suite runs many analyses from one client; rate limits are tested on their own (test_protections.py).
+for _limit in ("RATE_LIMIT_ANALYSES_PER_HOUR", "RATE_LIMIT_FILE_ACTIONS_PER_HOUR", "RATE_LIMIT_ASSISTANT_PER_HOUR"):
+    os.environ[_limit] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import time  # noqa: E402

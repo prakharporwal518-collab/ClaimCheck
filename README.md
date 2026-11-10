@@ -49,7 +49,10 @@ cd backend && python -m pytest -q
 | Variable | Default | What it does |
 |---|---|---|
 | `PAYPAL_MODE` | `mock` | `mock` = seeded disputes in the PayPal JSON shape; `sandbox` = real PayPal Sandbox; `hybrid` = both in one inbox, each labelled (the live site uses this) |
-| `SANDBOX_ACTIONS_KEY` | – | Optional: asked before Submit/Refund on real Sandbox disputes, so visitors can't use them up |
+| `SANDBOX_ACTIONS_KEY` | – | Optional: asked before Submit/Refund on real Sandbox disputes, and before Reset demo and saving the merchant settings, so visitors of a public demo can't use them up or change them |
+| `RATE_LIMIT_ANALYSES_PER_HOUR` | `10` | Per visitor (IP) per hour: Generate AI Defence and Simulate new dispute. `0` turns it off |
+| `RATE_LIMIT_FILE_ACTIONS_PER_HOUR` | `30` | Per visitor per hour: evidence uploads, sample evidence, order CSV import, re-tagging a file (they make the AI read files). `0` turns it off |
+| `RATE_LIMIT_ASSISTANT_PER_HOUR` | `30` | Per visitor per hour: Analytics AI assistant questions. `0` turns it off |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | – | Sandbox REST app credentials |
 | `PAYPAL_DISPUTES_PATH` | `/v1/customer/disputes` | Base path, kept as one setting so a v2 switch is a one-line change |
 | `PAYPAL_WEBHOOK_ID` | – | Needed for real PayPal Sandbox webhooks: every webhook is verified with PayPal, and without this ID they are refused |

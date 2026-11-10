@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import runner, sample_gen, sync
+from . import ratelimit, runner, sample_gen, sync
 from .config import BACKEND_DIR, SAMPLE_DIR, settings
 from .db import (
     Analysis,
@@ -206,8 +206,17 @@ def get_merchant_settings():
         return {k: getattr(m, k) for k in MerchantIn.model_fields}
 
 
+def _require_actions_key(request: Request) -> None:
+    """Demo-wide actions (Reset demo, saving the merchant settings) need SANDBOX_ACTIONS_KEY when it
+    is set, so visitors of the public demo can't change them, e.g. while a judge is looking."""
+    key = settings.sandbox_actions_key
+    if key and request.headers.get("X-Sandbox-Key") != key:
+        raise HTTPException(403, "This action is locked on the public demo: enter the action key to continue")
+
+
 @app.put("/api/settings/merchant")
-def put_merchant_settings(body: MerchantIn):
+def put_merchant_settings(body: MerchantIn, request: Request):
+    _require_actions_key(request)
     with SessionLocal() as s:
         m = get_merchant(s)
         for k, v in body.model_dump().items():
@@ -300,7 +309,9 @@ def _add_evidence(s, d: Dispute, filename: str, data: bytes, mime: str, tag: str
 
 
 @app.post("/api/disputes/{dispute_id}/evidence")
-async def upload_evidence(dispute_id: str, files: list[UploadFile] = File(...), tags: list[str] = Form(default=[])):
+async def upload_evidence(dispute_id: str, request: Request, files: list[UploadFile] = File(...),
+                          tags: list[str] = Form(default=[])):
+    ratelimit.check(request, "files", settings.rate_limit_files)
     with SessionLocal() as s:
         d = _get(s, dispute_id)
         created = []
@@ -323,7 +334,8 @@ class SampleIn(BaseModel):
 
 
 @app.post("/api/disputes/{dispute_id}/evidence/sample")
-def load_sample_evidence(dispute_id: str, body: SampleIn | None = None):
+def load_sample_evidence(dispute_id: str, request: Request, body: SampleIn | None = None):
+    ratelimit.check(request, "files", settings.rate_limit_files)
     scenario = body.scenario if body else None
     if scenario:
         # Files drawn on the fly with this dispute's own buyer, address, order and dates.
@@ -373,7 +385,7 @@ class EvidencePatch(BaseModel):
 
 
 @app.patch("/api/evidence/{evidence_id}")
-def patch_evidence(evidence_id: int, body: EvidencePatch):
+def patch_evidence(evidence_id: int, body: EvidencePatch, request: Request):
     rerun = False
     with SessionLocal() as s:
         ev = s.get(Evidence, evidence_id)
@@ -382,6 +394,7 @@ def patch_evidence(evidence_id: int, body: EvidencePatch):
         if body.tag and body.tag != ev.tag:
             if body.tag not in TAGS:
                 raise HTTPException(422, f"tag must be one of {TAGS}")
+            ratelimit.check(request, "files", settings.rate_limit_files)  # a new tag re-reads the file
             ev.tag = body.tag
             ev.state = "pending"
             rerun = True
@@ -427,8 +440,9 @@ CARRIER_LINKS = {
 
 
 @app.post("/api/disputes/{dispute_id}/order-csv")
-async def import_order_csv(dispute_id: str, file: UploadFile = File(...)):
+async def import_order_csv(dispute_id: str, request: Request, file: UploadFile = File(...)):
     """Order CSV import (Shopify/WooCommerce export): finds this dispute's order row."""
+    ratelimit.check(request, "files", settings.rate_limit_files)
     raw = (await file.read()).decode("utf-8-sig", errors="replace")
     return _import_order_rows(dispute_id, raw)
 
@@ -460,7 +474,8 @@ def _import_order_rows(dispute_id: str, raw: str) -> dict:
 # Analysis, report, submission
 # ---------------------------------------------------------------------------
 @app.post("/api/disputes/{dispute_id}/analyse")
-async def analyse(dispute_id: str):
+async def analyse(dispute_id: str, request: Request):
+    ratelimit.check(request, "analysis", settings.rate_limit_analyses)
     with SessionLocal() as s:
         d = _get(s, dispute_id)
         if d.analysis_state in ("queued", "running"):
@@ -627,7 +642,8 @@ async def paypal_webhook(request: Request):
 
 
 @app.post("/api/demo/simulate-dispute")
-async def simulate_dispute():
+async def simulate_dispute(request: Request):
+    ratelimit.check(request, "analysis", settings.rate_limit_analyses)  # it drafts a defence too
     if "mock" not in enabled_sources():
         raise HTTPException(400, "Only available with demo data; in sandbox, open a real dispute as the buyer")
     client = get_client("mock")
@@ -639,8 +655,9 @@ async def simulate_dispute():
 
 
 @app.post("/api/demo/reset")
-def reset_demo():
+def reset_demo(request: Request):
     """Reset the demo data. PayPal Sandbox disputes (and their evidence) are kept."""
+    _require_actions_key(request)
     if "mock" not in enabled_sources():
         raise HTTPException(400, "Only available with demo data")
     reset_mock_client()
@@ -690,7 +707,8 @@ def analytics():
 
 
 @app.post("/api/ai/studio-turn")
-def ai_studio_turn(req: dict):
+def ai_studio_turn(req: dict, request: Request):
+    ratelimit.check(request, "assistant", settings.rate_limit_assistant)
     return llm.studio_turn(req)
 
 
