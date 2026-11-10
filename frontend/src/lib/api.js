@@ -8,7 +8,9 @@ async function request(path, options = {}) {
       const body = await res.json()
       msg = body.detail || JSON.stringify(body)
     } catch { /* not JSON */ }
-    throw new Error(msg)
+    const err = new Error(msg)
+    err.status = res.status // lets pages tell "not found" apart from other errors
+    throw err
   }
   const type = res.headers.get('content-type') || ''
   return type.includes('application/json') ? res.json() : res

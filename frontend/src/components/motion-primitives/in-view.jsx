@@ -13,7 +13,9 @@ const START = 'top bottom-=40'
 // element stuck part-way, because from() would read that in-between value as its end point.
 const REST = { autoAlpha: 1, opacity: 1, scale: 1 }
 const restingFor = (from) => Object.fromEntries(Object.keys(from).map((k) => [k, REST[k] ?? 0]))
-const HIDDEN = { autoAlpha: 0, y: 16 }
+// Opacity only (not autoAlpha/visibility): content waiting to be revealed must stay reachable
+// with the Tab key, and tabbing to it scrolls it into view, which plays the reveal.
+const HIDDEN = { opacity: 0, y: 16 }
 
 /** Fades and slides its content up when it scrolls into view. */
 export function InView({ children, delay = 0, as: Comp = 'div', className, ...props }) {

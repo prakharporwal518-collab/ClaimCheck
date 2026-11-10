@@ -46,20 +46,22 @@ export function useLandingMotion(scope) {
 
 function heroIntro(q) {
   const [highlight] = q('.hero-highlight')
-  const title = SplitText.create(q('.hero-title'), { type: 'words' })
+  // aria: 'none' – the default puts aria-label on these plain <span>s, which isn't allowed on them.
+  // Splitting by words keeps the text readable as-is, and the words fade with opacity only.
+  const title = SplitText.create(q('.hero-title'), { type: 'words', aria: 'none' })
   // bg-clip-text doesn't follow moving children, so each word carries its own gradient.
-  const hl = highlight && SplitText.create(highlight, { type: 'words', wordsClass: HIGHLIGHT_GRADIENT })
+  const hl = highlight && SplitText.create(highlight, { type: 'words', wordsClass: HIGHLIGHT_GRADIENT, aria: 'none' })
   if (highlight) gsap.set(highlight, { backgroundImage: 'none' })
 
   const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
   tl.from(q('.hero-eyebrow'), { autoAlpha: 0, y: 10, duration: 0.5 })
     .from(title.words, {
-      autoAlpha: 0, yPercent: 60, filter: 'blur(8px)', duration: 0.7, stagger: 0.06, clearProps: 'filter',
+      opacity: 0, yPercent: 60, filter: 'blur(8px)', duration: 0.7, stagger: 0.06, clearProps: 'filter',
     }, '-=0.2')
 
   if (hl) {
     tl.from(hl.words, {
-      autoAlpha: 0, yPercent: 60, scale: 0.9, filter: 'blur(8px)', duration: 0.8, ease: 'back.out(1.6)', clearProps: 'filter',
+      opacity: 0, yPercent: 60, scale: 0.9, filter: 'blur(8px)', duration: 0.8, ease: 'back.out(1.6)', clearProps: 'filter',
     }, '-=0.35')
       // A slow sweep across the gradient once the word lands.
       .fromTo(hl.words,
@@ -88,17 +90,18 @@ function heroIntro(q) {
 function scrollReveals(q, ctx) {
   const items = q('[data-reveal]')
   const icons = q('[data-reveal] [data-pop]')
-  gsap.set(items, { autoAlpha: 0, y: 32 })
-  gsap.set(icons, { autoAlpha: 0, scale: 0.5, rotation: -15 })
+  // Opacity only, so links and buttons in sections not yet revealed stay reachable with Tab.
+  gsap.set(items, { opacity: 0, y: 32 })
+  gsap.set(icons, { opacity: 0, scale: 0.5, rotation: -15 })
 
   ScrollTrigger.batch(items, {
     start: 'top bottom-=12px',
     once: true,
     // ctx.add keeps tweens made in later callbacks inside this matchMedia context, so they revert with it.
     onEnter: (els) => ctx.add(() => {
-      gsap.to(els, { autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.1, overwrite: true })
+      gsap.to(els, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.1, overwrite: true })
       const pops = els.flatMap((el) => [...el.querySelectorAll('[data-pop]')])
-      if (pops.length) gsap.to(pops, { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.2)', stagger: 0.1, delay: 0.25 })
+      if (pops.length) gsap.to(pops, { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.2)', stagger: 0.1, delay: 0.25 })
     }),
   })
 }

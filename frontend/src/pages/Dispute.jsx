@@ -25,6 +25,7 @@ import { Appear, InView } from '@/components/motion-primitives/in-view'
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number'
 import { gsap, useGSAP, useMotionGSAP } from '@/lib/gsap'
 import { cn } from '@/lib/utils'
+import { DisputeNotFound } from './NotFound'
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -354,7 +355,10 @@ export default function Dispute() {
   const prevState = useRef(null)
   const prevAnalysisId = useRef(null)
 
-  const reload = useCallback(() => api.dispute(id).then(setD).catch((e) => notify(e.message, 'error')), [id, notify])
+  const [missing, setMissing] = useState(false) // the dispute id doesn't exist
+  const reload = useCallback(() => api.dispute(id)
+    .then((x) => { setD(x); setMissing(false) })
+    .catch((e) => { if (e.status === 404) setMissing(true); else notify(e.message, 'error') }), [id, notify])
   useEffect(() => { reload() }, [reload])
 
   const working = d && (['queued', 'running'].includes(d.analysis_state) || d.evidence.some((e) => ['pending', 'processing'].includes(e.state)))
@@ -428,6 +432,7 @@ export default function Dispute() {
     [popRun],
   )
 
+  if (missing) return <DisputeNotFound id={id} />
   if (!d) {
     return (
       <div className="space-y-5" role="status" aria-label="Loading dispute">

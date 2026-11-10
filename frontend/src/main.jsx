@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import AppShell from './components/AppShell'
 import Landing from './pages/Landing'
+import NotFound, { RouteError } from './pages/NotFound'
 import { Spinner } from './components/ui'
 
 // The landing page loads first; grids and AG Studio load with the app pages.
@@ -20,18 +21,21 @@ const page = (El, label = 'Loading…') => (
 )
 
 const router = createBrowserRouter([
-  { path: '/', element: <Landing /> },
+  { path: '/', element: <Landing />, errorElement: <RouteError /> },
   {
     path: '/app',
     element: <AppShell />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: page(Inbox) },
       { path: 'disputes/:id', element: page(Dispute) },
       { path: 'calendar', element: page(Calendar) },
       { path: 'analytics', element: page(Analytics, 'Loading AG Studio…') },
       { path: 'settings', element: page(Settings) },
+      { path: '*', element: <NotFound /> }, // unknown /app/... address, shown inside the app
     ],
   },
+  { path: '*', element: <NotFound standalone /> },
 ])
 
 createRoot(document.getElementById('root')).render(
