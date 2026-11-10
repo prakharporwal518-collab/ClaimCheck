@@ -7,7 +7,7 @@ import { useGridMotion } from '../lib/grid-motion'
 import { daysLabel, money, statusText } from '../lib/format'
 import { ScorePill, Spinner } from '../components/ui'
 import { useApp } from '../components/AppShell'
-import { AlarmClock, CircleDollarSign, FolderOpen, Gauge, Inbox as InboxIcon, RefreshCw, Search, Zap, AlertTriangle } from 'lucide-react'
+import { AlarmClock, CircleDollarSign, Clock, FolderOpen, Gauge, Inbox as InboxIcon, RefreshCw, Search, Zap, AlertTriangle } from 'lucide-react'
 import { PageHeader } from '@/components/blocks/page-header'
 import { StatCard } from '@/components/blocks/stat-card'
 import { DataTableCard } from '@/components/blocks/data-table'
@@ -144,21 +144,36 @@ export default function Inbox() {
         title="Dispute inbox"
         description="Item Not Received disputes from PayPal, sorted by response deadline."
         actions={
-          <>
-            <Button variant="outline" disabled={!!busy}
-              onClick={() => run('sync', api.sync, (r) => {
-                const parts = Object.entries(r.sources || {}).map(([k, v]) => `${k === 'sandbox' ? 'PayPal Sandbox' : 'demo data'}: ${v.error ? 'error – ' + v.error : `${v.listed} listed, ${v.new} new`}`)
-                return `Synced. ${parts.join(' · ')}`
-              })}>
-              {busy === 'sync' ? <Spinner /> : <RefreshCw />} Sync from PayPal
-            </Button>
-            {health?.paypal_sources?.includes('mock') && (
-              <Button disabled={!!busy}
-                onClick={() => run('sim', api.simulate, (r) => `Webhook CUSTOMER.DISPUTE.CREATED → ${r.dispute_id} synced, drafting a defence…`)}>
-                {busy === 'sim' ? <Spinner /> : <Zap />} Simulate new dispute (webhook)
+          <div className="flex flex-col items-start gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" disabled={!!busy}
+                onClick={() => run('sync', api.sync, (r) => {
+                  const parts = Object.entries(r.sources || {}).map(([k, v]) => {
+                    if (v.error) return `${k === 'sandbox' ? 'PayPal Sandbox' : 'demo data'}: error – ${v.error}`
+                    const counts = `${v.listed} listed, ${v.new} new`
+                    // PayPal Sandbox lists a newly opened dispute only after a few minutes.
+                    return k === 'sandbox'
+                      ? `PayPal Sandbox: ${counts}${v.new ? '' : ' (a dispute opened in the last few minutes may not be listed yet; sync again shortly)'}`
+                      : `demo data: ${counts}`
+                  })
+                  return `Synced. ${parts.join(' · ')}`
+                })}>
+                {busy === 'sync' ? <Spinner /> : <RefreshCw />} Sync from PayPal
               </Button>
+              {health?.paypal_sources?.includes('mock') && (
+                <Button disabled={!!busy}
+                  onClick={() => run('sim', api.simulate, (r) => `Webhook CUSTOMER.DISPUTE.CREATED → ${r.dispute_id} synced, drafting a defence…`)}>
+                  {busy === 'sim' ? <Spinner /> : <Zap />} Simulate new dispute (webhook)
+                </Button>
+              )}
+            </div>
+            {health?.paypal_sources?.includes('sandbox') && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                New PayPal Sandbox disputes can take a few minutes to appear here after they're opened.
+              </p>
             )}
-          </>
+          </div>
         }
       />
 
