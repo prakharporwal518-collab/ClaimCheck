@@ -46,7 +46,7 @@ function PreviewCard() {
   return (
     <div className="preview-float relative">
       <div aria-hidden="true" className="absolute -inset-4 -z-10 rounded-[28px] bg-gradient-to-br from-[var(--grad-a)]/25 via-transparent to-[var(--grad-c)]/20 blur-2xl" />
-      <div className="preview-tilt overflow-hidden rounded-2xl border bg-card shadow-pop will-change-transform">
+      <div className="preview-tilt glass overflow-hidden rounded-2xl border will-change-transform">
         <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3">
           <span className="font-mono text-xs text-muted-foreground">PP-D-48213 · $249.00 · Item Not Received</span>
           <Badge tone="success">High 9/10</Badge>
@@ -84,7 +84,8 @@ export default function Landing() {
   useLandingMotion(root)
 
   return (
-    <div ref={root} className="min-h-screen bg-background">
+    <div ref={root} className="relative isolate min-h-screen bg-background">
+      <div aria-hidden="true" className="bg-aurora pointer-events-none fixed inset-0 -z-10" />
       <div aria-hidden="true" className="scroll-progress pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 origin-left bg-gradient-to-r from-[var(--grad-a)] via-[var(--grad-b)] to-[var(--grad-c)]"
         style={{ transform: 'scaleX(0)' }} />
       <Navbar
@@ -157,7 +158,7 @@ export default function Landing() {
             <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FLOW.map(([Icon, t, d], i) => (
                 <li data-reveal key={t}
-                  className={`group relative rounded-xl border bg-card p-5 shadow-card transition-shadow hover:shadow-pop ${i === 5 ? 'ring-2 ring-primary' : ''}`}>
+                  className={`glass group relative rounded-xl border p-5 transition-transform duration-300 hover:-translate-y-1 ${i === 5 ? 'ring-2 ring-primary' : ''}`}>
                   <div className="flex items-center gap-3">
                     <span data-pop className="grid size-9 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="size-4" aria-hidden="true" /></span>
                     <span className="font-mono text-xs font-semibold text-primary-text">STEP {i + 1}</span>
@@ -174,7 +175,7 @@ export default function Landing() {
                 ['A score you can explain', 'Computed in code, never guessed: start at 4, +2 per claim contradicted by strong evidence, +1 weak, −2 per missing critical item, −3 per claim the buyer is right about. High 7–10, Medium 4–6, Low 0–3.'],
                 ['Honest, and private', 'If the parcel was returned to sender, ClaimCheck says so and recommends a refund. Buyer names, emails, phones, addresses and card numbers are masked before any AI call.'],
               ].map(([t, d]) => (
-                <div data-reveal key={t} className="rounded-xl border bg-card p-6 shadow-card">
+                <div data-reveal key={t} className="glass rounded-xl border p-6">
                   <CheckCircle2 data-pop className="size-5 text-success" aria-hidden="true" />
                   <div className="mt-3 font-semibold">{t}</div>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{d}</p>
@@ -191,7 +192,7 @@ export default function Landing() {
             <SectionTitle eyebrow="Built with" title="Sponsor tools, used where they matter." />
             <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {SPONSORS.map(([Icon, t, d]) => (
-                <div data-reveal key={t} className="rounded-xl border bg-card p-5 shadow-card">
+                <div data-reveal key={t} className="glass rounded-xl border p-5">
                   <div className="flex items-center gap-2.5 font-semibold">
                     <span data-pop className="grid size-8 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="size-4" aria-hidden="true" /></span>
                     {t}

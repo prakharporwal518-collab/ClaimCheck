@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 
 export function Card({ className, ...props }) {
-  return <section className={cn('rounded-xl border bg-card text-card-foreground shadow-card', className)} {...props} />
+  return <section className={cn('glass rounded-xl border text-card-foreground', className)} {...props} />
 }
 export function CardHeader({ className, ...props }) {
   return <div className={cn('flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5', className)} {...props} />

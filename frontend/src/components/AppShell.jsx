@@ -75,6 +75,7 @@ export default function AppShell() {
   return (
     <AppCtx.Provider value={{ health, notify }}>
       <div className="relative flex min-h-screen flex-col">
+        <div aria-hidden="true" className="bg-aurora pointer-events-none fixed inset-0 -z-10" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 overflow-hidden">
           <div className="bg-pattern-dots fade-bottom absolute inset-0" />
         </div>

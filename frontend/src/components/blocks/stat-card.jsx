@@ -12,7 +12,7 @@ const TONES = {
 
 export function StatCard({ label, value, format, suffix, icon: Icon, tone = 'default', hint, emphasis }) {
   return (
-    <InViewItem className="rounded-xl border bg-card p-4 shadow-card sm:p-5">
+    <InViewItem className="glass rounded-xl border p-4 transition-transform duration-300 hover:-translate-y-0.5 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="eyebrow">{label}</div>
         {Icon && (

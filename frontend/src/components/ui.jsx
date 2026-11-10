@@ -77,9 +77,9 @@ export function Spinner({ className = 'size-4' }) {
 }
 
 const TOAST = {
-  error: { icon: CircleAlert, cls: 'border-danger-border bg-card text-foreground [&_.ti]:text-danger' },
-  success: { icon: CheckCircle2, cls: 'border-success-border bg-card text-foreground [&_.ti]:text-success' },
-  info: { icon: Info, cls: 'border-border bg-card text-foreground [&_.ti]:text-primary-text' },
+  error: { icon: CircleAlert, cls: 'glass border-danger-border! text-foreground [&_.ti]:text-danger' },
+  success: { icon: CheckCircle2, cls: 'glass border-success-border! text-foreground [&_.ti]:text-success' },
+  info: { icon: Info, cls: 'glass text-foreground [&_.ti]:text-primary-text' },
 }
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -114,7 +114,7 @@ export function Toast({ toast, onClose, duration = 5000 }) {
     <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-end sm:inset-x-auto sm:right-5">
       {shown && (
         <div ref={box} role="status" aria-live="polite"
-          className={cn('pointer-events-auto relative flex w-full max-w-md items-start gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm shadow-pop', t.cls)}>
+          className={cn('pointer-events-auto relative flex w-full max-w-md items-start gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm', t.cls)}>
           <t.icon className="ti mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span className="flex-1 leading-relaxed">{shown.text}</span>
           <button onClick={onClose} className="rounded text-muted-foreground hover:text-foreground" aria-label="Dismiss">

@@ -32,7 +32,7 @@ export function AnalysisLoader({ steps, filesDone, startedAt }) {
   }
 
   return (
-    <div ref={root} className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-card" aria-live="polite">
+    <div ref={root} className="glass relative overflow-hidden rounded-xl border p-5" aria-live="polite">
       <div data-al="scan" aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
