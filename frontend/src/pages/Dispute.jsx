@@ -84,7 +84,11 @@ function IntegrityCell({ data }) {
   )
 }
 
-function StateCell({ data }) {
+function StateCell({ data, context }) {
+  // With Render Workflows on, uploaded files wait for the analysis: the workflow reads them all in
+  // parallel when it runs, so "pending" there isn't busy, just waiting.
+  if (data.state === 'pending' && context?.readOnAnalysis)
+    return <span className="text-muted-foreground" title="Render Workflows reads every file in parallel when the analysis runs">Read during analysis</span>
   if (data.state === 'pending' || data.state === 'processing')
     return <span className="flex items-center gap-1.5 text-primary-text"><Spinner className="size-3.5" /> Reading…</span>
   if (data.state === 'error') return <span className="text-danger-fg" title={data.error}>Error</span>
@@ -123,7 +127,7 @@ function ClaimDetail({ data, context }) {
 // ---------------------------------------------------------------------------
 // Evidence upload + grid + facts
 // ---------------------------------------------------------------------------
-function EvidencePanel({ d, linkedEvidence, reload, notify }) {
+function EvidencePanel({ d, linkedEvidence, reload, notify, readOnAnalysis }) {
   const evidenceMotion = useGridMotion() // newly uploaded files fade in with a highlight
   // Picking a claim flashes the evidence rows it relies on (they then keep their usual highlight).
   const linkedKey = [...linkedEvidence].sort().join(',')
@@ -274,6 +278,7 @@ function EvidencePanel({ d, linkedEvidence, reload, notify }) {
               theme={gridTheme}
               rowData={d.evidence}
               columnDefs={columns}
+              context={{ readOnAnalysis }}
               getRowId={(p) => String(p.data.id)}
               {...evidenceMotion.gridProps}
               defaultColDef={{ sortable: true, resizable: true }}
@@ -361,7 +366,11 @@ export default function Dispute() {
     .catch((e) => { if (e.status === 404) setMissing(true); else notify(e.message, 'error') }), [id, notify])
   useEffect(() => { reload() }, [reload])
 
-  const working = d && (['queued', 'running'].includes(d.analysis_state) || d.evidence.some((e) => ['pending', 'processing'].includes(e.state)))
+  // With Render Workflows on, the server leaves new files "pending" until the analysis, which reads
+  // them in parallel. Treating those as busy disabled Generate (and kept polling) forever.
+  const readOnAnalysis = !!health?.render_workflows
+  const fileBusy = (e) => e.state === 'processing' || (e.state === 'pending' && !readOnAnalysis)
+  const working = d && (['queued', 'running'].includes(d.analysis_state) || d.evidence.some(fileBusy))
   useEffect(() => {
     if (!working) return
     const t = setTimeout(reload, 1000)
@@ -621,7 +630,7 @@ export default function Dispute() {
 
         {/* Right: evidence */}
         <InView className="xl:col-span-7" delay={0.08}>
-          <EvidencePanel d={d} linkedEvidence={linkedEvidence} reload={reload} notify={notify} />
+          <EvidencePanel d={d} linkedEvidence={linkedEvidence} reload={reload} notify={notify} readOnAnalysis={readOnAnalysis} />
         </InView>
       </div>
 
