@@ -118,16 +118,29 @@ export function GapsCard({ analysis: a }) {
 export function ReportEditor({ value, onChange, onBlur, saved, open, approved, onApprove, busy, refundRecommended, statusLabel,
   onSubmit, onRefund, pdfUrl }) {
   const over = value.length > 2000
+  // Ticking "I have read this report" pulses Submit (the next step); going over the limit shakes
+  // the counter.
+  const submitBtn = useRef(null)
+  const counter = useRef(null)
+  useMotionGSAP(() => {
+    if (approved && submitBtn.current) gsap.to(submitBtn.current, { keyframes: { scale: [1, 1.08, 1] }, duration: 0.4, ease: 'power2.out', clearProps: 'transform' })
+  }, { scope: submitBtn, dependencies: [approved] })
+  useMotionGSAP(() => {
+    if (over) gsap.fromTo(counter.current, { x: 0 }, { keyframes: { x: [-4, 4, -3, 3, 0] }, duration: 0.4, ease: 'power1.inOut', clearProps: 'transform' })
+  }, { scope: counter, dependencies: [over] })
   return (
     <Card>
       <CardHeader>
         <CardTitle>Defence report</CardTitle>
-        <span className="text-xs text-muted-foreground">{saved ? 'Saved' : 'Unsaved changes'} · AI draft kept in the audit log</span>
+        <span className="text-xs text-muted-foreground">
+          <Appear as="span" watch={saved} from={{ autoAlpha: 0, y: -3 }} duration={0.25} className="inline-block">{saved ? 'Saved' : 'Unsaved changes'}</Appear>
+          {' '}· AI draft kept in the audit log
+        </span>
       </CardHeader>
       <CardContent>
         <Textarea value={value} onChange={onChange} onBlur={onBlur} disabled={!open} aria-label="Defence report"
           className="h-80 resize-y bg-muted/40 font-mono text-[13px] leading-relaxed" />
-        <div className={cn('mt-1.5 text-right text-xs tabular', over ? 'font-semibold text-danger-fg' : 'text-muted-foreground')}>
+        <div ref={counter} className={cn('mt-1.5 text-right text-xs tabular', over ? 'font-semibold text-danger-fg' : 'text-muted-foreground')}>
           {value.length} / 2000 characters (PayPal notes limit)
         </div>
         {open ? (
@@ -137,7 +150,7 @@ export function ReportEditor({ value, onChange, onBlur, saved, open, approved, o
               <span>I have read this report and the evidence. Send it to PayPal on my behalf.</span>
             </label>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button disabled={!approved || !!busy || over} onClick={onSubmit}>
+              <Button ref={submitBtn} disabled={!approved || !!busy || over} onClick={onSubmit}>
                 {busy === 'submit' ? <Spinner /> : <Send />} Submit to PayPal
               </Button>
               <Button as="a" variant="outline" href={pdfUrl}><FileDown /> Export PDF</Button>
