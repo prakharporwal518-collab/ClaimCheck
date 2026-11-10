@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { useApp } from '../components/AppShell'
 import { Spinner } from '../components/ui'
-import { Bot, Building2, Cpu, Database, Monitor, Moon, RotateCcw, ScanText, Settings as SettingsIcon, ShieldCheck, Sun, Workflow, BookOpen, Save, Landmark } from 'lucide-react'
+import { Bot, Building2, Check, Cpu, Database, Monitor, Moon, RotateCcw, ScanText, Settings as SettingsIcon, ShieldCheck, Sun, Workflow, BookOpen, Save, Landmark } from 'lucide-react'
 import { PageHeader } from '@/components/blocks/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
-import { InView } from '@/components/motion-primitives/in-view'
+import { Appear, InView } from '@/components/motion-primitives/in-view'
+import { gsap, useGSAP, useMotionGSAP } from '@/lib/gsap'
 import { useTheme } from '@/lib/theme'
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const FIELDS = [
   ['business_name', 'Business name'],
@@ -22,8 +25,33 @@ const FIELDS = [
 export default function Settings() {
   const { health, notify } = useApp()
   const [m, setM] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState('') // '' | 'save' | 'reset'
+  const [saved, setSaved] = useState(false) // shows "Saved" on the button for a moment
   useEffect(() => { api.merchant().then(setM) }, [])
+
+  // Save feedback: the tick pops and the button pulses after a save; the form shakes if it fails.
+  const page = useRef(null)
+  const form = useRef(null)
+  const saveBtn = useRef(null)
+  const savedTimer = useRef(null)
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
+  const { contextSafe } = useGSAP({ scope: page })
+  const shake = contextSafe(() => {
+    if (reducedMotion() || !form.current) return
+    gsap.fromTo(form.current, { x: 0 }, { keyframes: { x: [-8, 8, -6, 6, -3, 0] }, duration: 0.45, ease: 'power1.inOut', clearProps: 'transform' })
+  })
+  useMotionGSAP(() => {
+    if (!saved) return
+    gsap.fromTo('[data-saved-icon]', { scale: 0, rotation: -45 }, { scale: 1, rotation: 0, duration: 0.45, ease: 'back.out(3)' })
+    gsap.to(saveBtn.current, { keyframes: { scale: [1, 1.06, 1] }, duration: 0.35, ease: 'power2.out', clearProps: 'transform' })
+  }, { scope: saveBtn, dependencies: [saved] })
+
+  // Reset demo: the arrow spins (backwards, like "undo") while the reset runs.
+  const resetIcon = useRef(null)
+  useMotionGSAP(() => {
+    if (busy !== 'reset') return
+    gsap.to(resetIcon.current, { rotation: '-=360', duration: 0.8, ease: 'none', repeat: -1 })
+  }, { scope: resetIcon, dependencies: [busy] })
 
   const { theme, setTheme } = useTheme()
   const rows = health && !health.offline ? [
@@ -40,7 +68,7 @@ export default function Settings() {
   ] : []
 
   return (
-    <div className="space-y-6">
+    <div ref={page} className="space-y-6">
       <PageHeader icon={SettingsIcon} title="Settings" description="Your business details, appearance and the services this ClaimCheck is connected to." />
       <div className="grid gap-5 lg:grid-cols-2">
         <InView>
@@ -53,19 +81,35 @@ export default function Settings() {
                 phone, address, card numbers) is replaced with placeholders before any AI call.
               </p>
               {!m ? <Spinner /> : (
-                <form className="space-y-4" onSubmit={async (e) => {
+                <div ref={form}>
+                {/* Fields drop in one after another once your details have loaded. */}
+                <Appear as="form" className="space-y-4" stagger={0.05} from={{ autoAlpha: 0, y: 8 }} onSubmit={async (e) => {
                   e.preventDefault()
-                  setBusy(true)
-                  try { await api.saveMerchant(m); notify('Saved', 'success') } catch (err) { notify(err.message, 'error') } finally { setBusy(false) }
+                  setBusy('save')
+                  try {
+                    await api.saveMerchant(m)
+                    notify('Saved', 'success')
+                    setSaved(true)
+                    clearTimeout(savedTimer.current)
+                    savedTimer.current = setTimeout(() => setSaved(false), 2000)
+                  } catch (err) {
+                    notify(err.message, 'error')
+                    shake()
+                  } finally { setBusy('') }
                 }}>
                   {FIELDS.map(([k, label]) => (
                     <div key={k} className="space-y-1.5">
                       <Label htmlFor={`f-${k}`}>{label}</Label>
-                      <Input id={`f-${k}`} value={m[k] || ''} onChange={(e) => setM({ ...m, [k]: e.target.value })} />
+                      <Input id={`f-${k}`} value={m[k] || ''} onChange={(e) => { setM({ ...m, [k]: e.target.value }); setSaved(false) }} />
                     </div>
                   ))}
-                  <Button type="submit" disabled={busy}>{busy ? <Spinner /> : <Save />} Save</Button>
-                </form>
+                  <div>
+                    <Button ref={saveBtn} type="submit" disabled={!!busy}>
+                      {busy === 'save' ? <Spinner /> : saved ? <Check data-saved-icon="" /> : <Save />} {saved ? 'Saved' : 'Save'}
+                    </Button>
+                  </div>
+                </Appear>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -88,14 +132,15 @@ export default function Settings() {
               <CardHeader><CardTitle as="h2"><Cpu />System</CardTitle></CardHeader>
               <CardContent>
                 {!health ? <Spinner /> : (
-                  <dl className="divide-y">
+                  // System rows slide in one by one once the status has loaded.
+                  <Appear as="dl" className="divide-y" stagger={0.05} from={{ autoAlpha: 0, x: -10 }}>
                     {rows.map(([Icon, k, v]) => (
                       <div key={k} className="grid grid-cols-[130px_1fr] gap-3 py-2.5 text-sm sm:grid-cols-[150px_1fr]">
                         <dt className="flex items-center gap-2 text-muted-foreground"><Icon className="size-4" aria-hidden="true" />{k}</dt>
                         <dd className="min-w-0 break-words">{v}</dd>
                       </div>
                     ))}
-                  </dl>
+                  </Appear>
                 )}
               </CardContent>
             </Card>
@@ -106,11 +151,11 @@ export default function Settings() {
                 <CardHeader><CardTitle as="h2"><RotateCcw />Demo data</CardTitle></CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Reset every demo dispute, file and analysis back to the seeded state.{health?.paypal_sources?.includes('sandbox') && ' PayPal Sandbox disputes are kept.'}</p>
-                  <Button variant="outline" className="mt-4" disabled={busy} onClick={async () => {
+                  <Button variant="outline" className="mt-4" disabled={!!busy} onClick={async () => {
                     if (!confirm('Reset all demo data?')) return
-                    setBusy(true)
-                    try { await api.reset(); notify('Demo data reset', 'success') } finally { setBusy(false) }
-                  }}><RotateCcw /> Reset demo</Button>
+                    setBusy('reset')
+                    try { await api.reset(); notify('Demo data reset', 'success') } catch (err) { notify(err.message, 'error') } finally { setBusy('') }
+                  }}><span ref={resetIcon} className="inline-flex"><RotateCcw /></span> {busy === 'reset' ? 'Resetting…' : 'Reset demo'}</Button>
                 </CardContent>
               </Card>
             </InView>
