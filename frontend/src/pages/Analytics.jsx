@@ -61,7 +61,10 @@ const geminiAdapter = {
   },
 }
 
-if (import.meta.env.VITE_AG_GRID_LICENSE_KEY) AgStudioLicenseManager.setLicenseKey(import.meta.env.VITE_AG_GRID_LICENSE_KEY)
+// AG Studio has its own licence (an AG Studio key is rejected by AG Grid Enterprise), so it reads
+// its own variable; the shared AG Grid variable is the fallback.
+const studioKey = import.meta.env.VITE_AG_STUDIO_LICENSE_KEY || import.meta.env.VITE_AG_GRID_LICENSE_KEY
+if (studioKey) AgStudioLicenseManager.setLicenseKey(studioKey)
 
 const PROMPTS = [
   { label: 'Due this week, Low score', prompt: 'Which open disputes are due in the next 7 days and have a Low evidence strength? Show them in a table.' },

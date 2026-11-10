@@ -59,7 +59,8 @@ cd backend && python -m pytest -q
 | `USE_RENDER_WORKFLOWS` + `RENDER_API_KEY` | off | Runs the analysis as a Render Workflow (needs a shared `DATABASE_URL`) |
 | `WORKFLOW_START_TIMEOUT` | `90` | Seconds before the web service takes over a Workflow run that hasn't started |
 | `DATABASE_URL` | SQLite in `backend/data/` | Postgres in production (the live site uses Neon) |
-| `VITE_AG_GRID_LICENSE_KEY` (frontend build) | – | Removes the AG Grid / AG Studio trial watermark |
+| `VITE_AG_GRID_LICENSE_KEY` (frontend build) | – | AG Grid Enterprise key: removes the trial watermark on the Inbox and Dispute grids |
+| `VITE_AG_STUDIO_LICENSE_KEY` (frontend build) | – | AG Studio key: removes the trial watermark on the Analytics dashboard (falls back to `VITE_AG_GRID_LICENSE_KEY`). The two products need separate keys |
 
 ## How it works
 
@@ -99,7 +100,7 @@ FastAPI ──► PayPal Disputes API (Sandbox / seeded mock) ◄── webhook 
 - **Claim-vs-evidence grid** (`Dispute.jsx`): master-detail rows that expand into the cited facts and source files; clicking a claim highlights the linked files.
 - **Evidence grid**: editable tag cell (rich select editor) that re-reads the file, OCR confidence (amber below 60%), vision-model flag, integrity badge.
 - **Analytics** (`Analytics.jsx`, `lib/studioReport.js`): an AG Studio dashboard that loads pre-built (money at risk, disputes by status, fight vs refund, amount by strength, outcomes, all disputes). In Edit mode the **AI assistant** is connected to Gemini through a custom `AgLlmAdapter` that calls `POST /api/ai/studio-turn`, which translates AG Studio tool calls into Gemini function calling.
-- Licence: Master-detail, rich select and AG Studio are Enterprise features and show a trial watermark until `VITE_AG_GRID_LICENSE_KEY` is set.
+- Licence: Master-detail, rich select and AG Studio are Enterprise features and show a trial watermark until `VITE_AG_GRID_LICENSE_KEY` (AG Grid) and `VITE_AG_STUDIO_LICENSE_KEY` (AG Studio) are set. They are separate licences: an AG Studio key is rejected by AG Grid Enterprise.
 
 ### Render + Render Workflows
 - `render.yaml` Blueprint: one Docker web service (the API serves the built React app on the same URL). The Dockerfile installs Tesseract. By default the live demo stores data in SQLite inside the container and reloads the demo disputes on each start; set `DATABASE_URL` (Render Postgres, Supabase or Neon) to keep data. Render allows one free Postgres per workspace.

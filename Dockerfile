@@ -8,8 +8,11 @@ RUN npm ci
 COPY frontend/ ./
 # The API is served from the same origin in this image.
 ENV VITE_API_BASE=""
+# Licence keys are baked into the frontend build (Render passes service env vars as build args).
 ARG VITE_AG_GRID_LICENSE_KEY=""
 ENV VITE_AG_GRID_LICENSE_KEY=$VITE_AG_GRID_LICENSE_KEY
+ARG VITE_AG_STUDIO_LICENSE_KEY=""
+ENV VITE_AG_STUDIO_LICENSE_KEY=$VITE_AG_STUDIO_LICENSE_KEY
 RUN npm run build
 
 FROM python:3.13-slim
