@@ -3,6 +3,7 @@ import { LicenseManager, MasterDetailModule, RichSelectModule, SetFilterModule, 
 
 ModuleRegistry.registerModules([AllCommunityModule, MasterDetailModule, RichSelectModule, SetFilterModule, StatusBarModule])
 
+// AG Grid Enterprise key only (AG Studio reads VITE_AG_STUDIO_LICENSE_KEY in pages/Analytics.jsx).
 const key = import.meta.env.VITE_AG_GRID_LICENSE_KEY
 if (key) {
   LicenseManager.setLicenseKey(key)
