@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { useApp } from '../components/AppShell'
 import { Spinner } from '../components/ui'
-import { Bot, Building2, Check, Cpu, Database, Monitor, Moon, RotateCcw, ScanText, Settings as SettingsIcon, ShieldCheck, Sun, Workflow, BookOpen, Save, Landmark } from 'lucide-react'
+import { Bot, Building2, Check, Cpu, Lock, Database, Monitor, Moon, RotateCcw, ScanText, Settings as SettingsIcon, ShieldCheck, Sun, Workflow, BookOpen, Save, Landmark } from 'lucide-react'
 import { PageHeader } from '@/components/blocks/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,8 +22,27 @@ const FIELDS = [
   ['support_name', 'Name used in chats'],
 ]
 
+function LockedNote() {
+  return (
+    <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+      Locked on the public demo: this asks for the owner's action key.
+    </p>
+  )
+}
+
 export default function Settings() {
   const { health, notify } = useApp()
+  // On the public demo, Save and Reset demo need the owner's action key (SANDBOX_ACTIONS_KEY).
+  // It's asked for once and remembered for this visit; a rejected key is forgotten.
+  const locked = !!health?.sandbox_actions_locked
+  const actionKey = useRef('')
+  const askKey = () => {
+    if (!locked) return ''
+    if (actionKey.current) return actionKey.current
+    return prompt('This action is locked on the public demo. Enter the action key:')
+  }
+  const rememberKey = (key, err) => { actionKey.current = err?.status === 403 ? '' : key }
   const [m, setM] = useState(null)
   const [busy, setBusy] = useState('') // '' | 'save' | 'reset'
   const [saved, setSaved] = useState(false) // shows "Saved" on the button for a moment
@@ -89,14 +108,18 @@ export default function Settings() {
                 {/* Fields drop in one after another once your details have loaded. */}
                 <Appear as="form" className="space-y-4" stagger={0.05} from={{ autoAlpha: 0, y: 8 }} onSubmit={async (e) => {
                   e.preventDefault()
+                  const key = askKey()
+                  if (key === null) return
                   setBusy('save')
                   try {
-                    await api.saveMerchant(m)
+                    await api.saveMerchant(m, key)
+                    rememberKey(key)
                     notify('Saved', 'success')
                     setSaved(true)
                     clearTimeout(savedTimer.current)
                     savedTimer.current = setTimeout(() => setSaved(false), 2000)
                   } catch (err) {
+                    rememberKey(key, err)
                     notify(err.message, 'error')
                     shake()
                   } finally { setBusy('') }
@@ -111,6 +134,7 @@ export default function Settings() {
                     <Button ref={saveBtn} type="submit" disabled={!!busy}>
                       {busy === 'save' ? <Spinner /> : saved ? <Check data-saved-icon="" /> : <Save />} {saved ? 'Saved' : 'Save'}
                     </Button>
+                    {locked && <LockedNote />}
                   </div>
                 </Appear>
                 </div>
@@ -157,9 +181,14 @@ export default function Settings() {
                   <p className="text-sm text-muted-foreground">Reset every demo dispute, file and analysis back to the seeded state.{health?.paypal_sources?.includes('sandbox') && ' PayPal Sandbox disputes are kept.'}</p>
                   <Button variant="outline" className="mt-4" disabled={!!busy} onClick={async () => {
                     if (!confirm('Reset all demo data?')) return
+                    const key = askKey()
+                    if (key === null) return
                     setBusy('reset')
-                    try { await api.reset(); notify('Demo data reset', 'success') } catch (err) { notify(err.message, 'error') } finally { setBusy('') }
+                    try { await api.reset(key); rememberKey(key); notify('Demo data reset', 'success') }
+                    catch (err) { rememberKey(key, err); notify(err.message, 'error') }
+                    finally { setBusy('') }
                   }}><span ref={resetIcon} className="inline-flex"><RotateCcw /></span> {busy === 'reset' ? 'Resetting…' : 'Reset demo'}</Button>
+                  {locked && <LockedNote />}
                 </CardContent>
               </Card>
             </InView>

@@ -67,7 +67,14 @@ class Settings:
 
     # Optional: when set, submitting or refunding a *PayPal Sandbox* dispute asks for this key,
     # so visitors of a public demo cannot use up the real Sandbox disputes.
+    # The same key also locks the demo-wide actions: Reset demo and saving the merchant settings.
     sandbox_actions_key: str = field(default_factory=lambda: _env("SANDBOX_ACTIONS_KEY"))
+
+    # Per-visitor limits per hour for actions that spend Gemini quota / Render Workflows compute
+    # (see app/ratelimit.py). 0 turns a limit off.
+    rate_limit_analyses: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_ANALYSES_PER_HOUR", "10")))
+    rate_limit_files: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_FILE_ACTIONS_PER_HOUR", "30")))
+    rate_limit_assistant: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_ASSISTANT_PER_HOUR", "30")))
 
     # --- Web ------------------------------------------------------------------
     cors_origins: list[str] = field(

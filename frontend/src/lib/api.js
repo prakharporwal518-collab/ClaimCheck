@@ -52,9 +52,10 @@ export const api = {
   acceptClaim: (id, note, key) => request(`/api/disputes/${id}/accept-claim`, withKey(json('POST', { note }), key)),
   pdfUrl: (id) => `${BASE}/api/disputes/${id}/report.pdf`,
   simulate: () => request('/api/demo/simulate-dispute', { method: 'POST' }),
-  reset: () => request('/api/demo/reset', { method: 'POST' }),
+  // Reset demo and saving the merchant settings need the action key when the server has one set.
+  reset: (key) => request('/api/demo/reset', withKey({ method: 'POST' }, key)),
   analytics: () => request('/api/analytics'),
   merchant: () => request('/api/settings/merchant'),
-  saveMerchant: (body) => request('/api/settings/merchant', json('PUT', body)),
+  saveMerchant: (body, key) => request('/api/settings/merchant', withKey(json('PUT', body), key)),
   studioTurn: (body, signal) => request('/api/ai/studio-turn', { ...json('POST', body), signal }),
 }
