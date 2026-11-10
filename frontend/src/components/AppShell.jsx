@@ -19,9 +19,9 @@ const NAV = [
   { to: '/app/settings', label: 'Settings', icon: Settings },
 ]
 
-function Status({ ok, on, off }) {
+function Status({ ok, on, off, title }) {
   return (
-    <Badge tone={ok ? 'success' : 'neutral'}>
+    <Badge tone={ok ? 'success' : 'neutral'} title={title}>
       <span className={`size-1.5 rounded-full ${ok ? 'bg-success' : 'bg-subtle'}`} aria-hidden="true" />
       {ok ? on : off}
     </Badge>
@@ -64,7 +64,11 @@ export default function AppShell() {
       <Status ok={health.paypal_sources?.includes('sandbox')}
         on={health.paypal_sources?.includes('mock') ? 'PayPal Sandbox + demo data' : 'PayPal Sandbox'} off="PayPal: seeded demo" />
       <Status ok={health.gemini} on={health.gemini_model} off="AI: rules engine" />
-      <Status ok={health.render_workflows} on="Render Workflows" off="In-process jobs" />
+      {/* In-process is a working mode (the free-plan default), not a missing feature, so it shows green. */}
+      <Status ok on={health.render_workflows ? 'Render Workflows' : 'Jobs: in-process'}
+        title={health.render_workflows
+          ? 'Analyses run as Render Workflow runs on separate workers.'
+          : 'Analyses run inside the web service. Render Workflows is supported but not enabled (it switches on when RENDER_API_KEY is set).'} />
     </>
   ))
 

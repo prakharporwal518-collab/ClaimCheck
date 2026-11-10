@@ -61,7 +61,11 @@ export default function Settings() {
         : health.paypal_sources?.includes('sandbox') ? 'PayPal Sandbox (live API calls)' : 'Seeded mock in the PayPal API JSON shape'}
       {' · '}<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{health.paypal_disputes_path}</code></>],
     [Bot, 'AI model', health.gemini ? health.gemini_model : 'Rules engine (set GEMINI_API_KEY to use Gemini)'],
-    [Workflow, 'Jobs', health.render_workflows ? 'Render Workflows (parallel extraction + retries)' : 'In-process fallback'],
+    [Workflow, 'Jobs', health.render_workflows ? 'Render Workflows (parallel extraction + retries)' : <>
+      In-process (Render Workflows supported, not enabled)
+      <span className="mt-0.5 block text-xs text-muted-foreground">
+        Analyses run the same pipeline inside the web service. Setting RENDER_API_KEY moves them to Render Workflows.
+      </span></>],
     [ScanText, 'OCR', health.ocr ? 'Tesseract installed (OCR-first)' : 'Tesseract not installed'],
     [Database, 'Database', health.database],
     [BookOpen, 'Playbooks', health.playbooks.map((p) => `${p.label} (${p.status})`).join(', ')],
