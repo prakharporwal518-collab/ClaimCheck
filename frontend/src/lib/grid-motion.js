@@ -82,5 +82,20 @@ export function useGridMotion(resetKey) {
     if (e.node.expanded && !reducedMotion()) fadeInDetail(e.node.id, 20)
   }
 
-  return { ref, gridProps: { onFirstDataRendered, onRowDataUpdated, onRowGroupOpened } }
+  // Briefly flash the rows matching `selector` (e.g. rows just linked to a selected claim) in the
+  // primary colour, fading back to their normal look. Waits a few frames for AG Grid to apply
+  // new row classes.
+  const flashRows = contextSafe((selector, framesLeft = 10) => {
+    if (reducedMotion()) return
+    const cells = ref.current ? [...ref.current.querySelectorAll(`${selector} .ag-cell`)] : []
+    if (!cells.length) {
+      if (framesLeft > 0) requestAnimationFrame(() => flashRows(selector, framesLeft - 1))
+      return
+    }
+    const [r, g, b] = gsap.utils.splitColor(getComputedStyle(ref.current).getPropertyValue('--primary').trim() || '#2a52d9')
+    gsap.fromTo(cells, { backgroundColor: `rgba(${r},${g},${b},0.3)` },
+      { backgroundColor: `rgba(${r},${g},${b},0)`, duration: 1, ease: 'power2.out', overwrite: true, clearProps: 'backgroundColor' })
+  })
+
+  return { ref, flashRows, gridProps: { onFirstDataRendered, onRowDataUpdated, onRowGroupOpened } }
 }

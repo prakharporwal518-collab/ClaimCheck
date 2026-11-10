@@ -22,7 +22,11 @@ import { FileUpload } from '@/components/blocks/file-upload'
 import { AnalysisLoader } from '@/components/blocks/analysis-loader'
 import { GapsCard, ReportEditor, StrengthCard } from '@/components/blocks/report-view'
 import { Appear, InView } from '@/components/motion-primitives/in-view'
+import { AnimatedNumber } from '@/components/motion-primitives/animated-number'
+import { gsap, useGSAP, useMotionGSAP } from '@/lib/gsap'
 import { cn } from '@/lib/utils'
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const TAGS = ['Invoice', 'Tracking', 'Chat', 'Delivery photo', 'Order', 'Other']
 const PIPELINE = [
@@ -120,6 +124,9 @@ function ClaimDetail({ data, context }) {
 // ---------------------------------------------------------------------------
 function EvidencePanel({ d, linkedEvidence, reload, notify }) {
   const evidenceMotion = useGridMotion() // newly uploaded files fade in with a highlight
+  // Picking a claim flashes the evidence rows it relies on (they then keep their usual highlight).
+  const linkedKey = [...linkedEvidence].sort().join(',')
+  useEffect(() => { if (linkedKey) evidenceMotion.flashRows('.ag-row.row-linked') }, [linkedKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const [drag, setDrag] = useState(false)
   const [busy, setBusy] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -385,6 +392,20 @@ export default function Dispute() {
   const a = d?.analysis
   // Claim rows replay their entrance for each new analysis; expanded rows fade their detail in.
   const claimMotion = useGridMotion(a?.id)
+
+  const page = useRef(null)
+  const { contextSafe } = useGSAP({ scope: page })
+  // A deadline 3 days away or less: the days-left figure pulses a few times once the page is up.
+  useMotionGSAP(() => {
+    const days = page.current?.querySelector('[data-urgent-days]') // absent until the dispute loads, or when not urgent
+    if (days) gsap.to(days, { keyframes: { scale: [1, 1.25, 1] }, duration: 0.6, repeat: 2, delay: 0.6, ease: 'power2.inOut', transformOrigin: 'left center' })
+  }, { scope: page, dependencies: [d?.id] })
+  // Opening the audit log reveals its entries one by one.
+  const onAuditToggle = contextSafe((e) => {
+    if (!e.currentTarget.open || reducedMotion()) return
+    const items = [...e.currentTarget.querySelectorAll('li')].slice(0, 20)
+    gsap.fromTo(items, { autoAlpha: 0, x: -6 }, { autoAlpha: 1, x: 0, duration: 0.25, stagger: 0.03, ease: 'power2.out', clearProps: 'all' })
+  })
   const factsById = useMemo(() => Object.fromEntries((a?.facts || []).map((f) => [f.id, f])), [a])
   const claimRows = useMemo(() => (a?.results || []).map((r, i) => ({ ...r, n: i + 1 })), [a])
   const linkedEvidence = useMemo(() => {
@@ -463,7 +484,7 @@ export default function Dispute() {
   const filesDone = !d.evidence.some((e) => ['pending', 'processing'].includes(e.state))
 
   return (
-    <div className="space-y-5">
+    <div ref={page} className="space-y-5">
       {/* Top bar */}
       <InView>
         <Card className="relative overflow-hidden">
@@ -478,13 +499,19 @@ export default function Dispute() {
               <div className="mt-0.5 truncate text-lg font-bold tracking-tight">{d.buyer} <span className="font-normal text-muted-foreground">· {d.item}</span></div>
             </div>
             <dl className="flex flex-wrap gap-x-6 gap-y-3">
-              <div><dt className="eyebrow">Amount</dt><dd className="font-semibold tabular">{money(d.amount, d.currency)}</dd></div>
+              <div><dt className="eyebrow">Amount</dt><dd className="font-semibold tabular"><AnimatedNumber value={d.amount} format={(v) => money(v, d.currency)} /></dd></div>
               <div><dt className="eyebrow">Reason</dt><dd><Badge tone="info">Item Not Received</Badge></dd></div>
-              <div><dt className="eyebrow">Respond within</dt><dd className={cn('font-mono font-semibold tabular', urgent && 'text-danger-fg')}>{open ? daysLabel(d.days_left) : '—'}</dd></div>
+              <div><dt className="eyebrow">Respond within</dt><dd className={cn('font-mono font-semibold tabular', urgent && 'text-danger-fg')}>
+                <span className="inline-block" data-urgent-days={urgent && open ? '' : undefined}>{open ? daysLabel(d.days_left) : '—'}</span>
+              </dd></div>
               <div><dt className="eyebrow">Status</dt><dd className="text-sm font-semibold">{statusText(d.status)}{d.decision !== 'open' && ` · ${d.decision}`}</dd></div>
             </dl>
             <div className="flex w-full items-center gap-3 md:ml-auto md:w-auto">
-              {a && <ScorePill label={a.strength_label} score={a.strength_score} />}
+              {a && (
+                <Appear as="span" className="inline-flex" watch={`${a.strength_label}${a.strength_score}`} from={{ autoAlpha: 0, scale: 0.6 }} duration={0.45}>
+                  <ScorePill label={a.strength_label} score={a.strength_score} />
+                </Appear>
+              )}
               <Button size="lg" className="flex-1 md:flex-none" onClick={generate} disabled={!!busy || working || !open || pendingConfirm}
                 title={pendingConfirm ? 'Confirm the amber facts first' : ''}>
                 {running ? <Spinner /> : <Sparkles />} {a ? 'Re-run AI Defence' : 'Generate AI Defence'}
@@ -504,9 +531,11 @@ export default function Dispute() {
       )}
 
       {pendingConfirm && (
-        <Alert tone="warning" icon={AlertTriangle}>
-          Some facts were read with low OCR confidence. Tick <b>Please confirm</b> on each amber fact (or fix the file) before running the analysis.
-        </Alert>
+        <Appear from={{ autoAlpha: 0, y: -8 }}>
+          <Alert tone="warning" icon={AlertTriangle}>
+            Some facts were read with low OCR confidence. Tick <b>Please confirm</b> on each amber fact (or fix the file) before running the analysis.
+          </Alert>
+        </Appear>
       )}
 
       {history && (
@@ -526,7 +555,9 @@ export default function Dispute() {
       ) : full && (
         <InView>
           <Card className="px-5 py-3.5">
-            <ol className="flex flex-wrap items-center gap-x-1 gap-y-2 text-xs">
+            {/* The pipeline steps appear one by one after each analysis. */}
+            <Appear as="ol" watch={a?.id} stagger={0.05} from={{ autoAlpha: 0, x: -6 }} duration={0.3}
+              className="flex flex-wrap items-center gap-x-1 gap-y-2 text-xs">
               {PIPELINE.map((name, i) => {
                 const step = a?.steps?.find((st) => st.name === name)
                 return (
@@ -540,7 +571,7 @@ export default function Dispute() {
                   </li>
                 )
               })}
-            </ol>
+            </Appear>
             <div className="mt-2 text-xs text-muted-foreground">
               Engine: <b className="text-foreground">{a.engine}</b> · ran {d.analysis_engine === 'render-workflows' ? <>as a <b className="text-foreground">Render Workflow</b> ({d.analysis_run_id})</> : (d.analysis_engine || 'in-process')} · pipeline {(a.duration_ms / 1000).toFixed(1)} s
               {elapsed != null && <> · <b className="text-success-fg">defence drafted in {elapsed.toFixed(1)} s</b> (vs ~20 min by hand)</>}
@@ -548,7 +579,9 @@ export default function Dispute() {
           </Card>
         </InView>
       )}
-      {d.analysis_state === 'error' && <Alert tone="danger" icon={AlertTriangle}>Analysis failed: {d.analysis_error}</Alert>}
+      {d.analysis_state === 'error' && (
+        <Appear from={{ autoAlpha: 0, y: -8 }}><Alert tone="danger" icon={AlertTriangle}>Analysis failed: {d.analysis_error}</Alert></Appear>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-12">
         {/* Left: customer claim */}
@@ -646,7 +679,7 @@ export default function Dispute() {
 
       {/* Audit log */}
       <Card>
-        <details className="group">
+        <details className="group" onToggle={onAuditToggle}>
           <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-semibold">
             <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
             <ScrollText className="size-4 text-muted-foreground" aria-hidden="true" />
